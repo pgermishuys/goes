@@ -17,7 +17,7 @@ type TCPPackage struct {
 }
 
 // ParseTCPPackage reads the bytes into a TcpPackage
-func ParseTCPPackage(reader io.Reader) (TCPPackage, error) {
+func parseTCPPackage(reader io.Reader) (TCPPackage, error) {
 	var pkg TCPPackage
 	err := binary.Read(reader, binary.LittleEndian, &pkg.PackageLength)
 	if err != nil {
