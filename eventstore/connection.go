@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/satori/go.uuid"
 	"log"
 	"net"
 )
@@ -14,7 +15,7 @@ type Configuration struct {
 }
 type Connection struct {
 	Config *Configuration
-	Socket net.Conn
+	Socket *net.TCPConn
 }
 
 // Connect attempts to connect to Event Store using the given configuration
@@ -29,6 +30,9 @@ func (connection *Connection) Connect() error {
 	}
 	log.Printf("[info] succesfully connected to event store on %s", address)
 	connection.Socket = conn
+	receiver := make(chan []byte)
+
+	go startRead(connection, receiver)
 	return nil
 }
 
@@ -38,9 +42,31 @@ func (connection *Connection) Close() error {
 	return connection.Socket.Close()
 }
 
-func startRead(connection *Connection) {
+func startRead(connection *Connection, receiver chan []byte) {
+	buffer := make([]byte, 1024)
 	for {
 		fmt.Println("[info] heartbeat")
+		written, err := connection.Socket.Read(buffer)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		msg, err := ParseTCPPackage(bytes.NewReader(buffer))
+		if err != nil {
+			log.Fatalf("[fatal] could not decode tcp package: %+v\n", err.Error())
+		}
+		switch msg.Command {
+		case HeartbeatRequest:
+			log.Printf("[info] received heartbeat request of %+v bytes", written)
+			sendCommand(HeartbeatResponse, msg, connection.Socket)
+			break
+		case Pong:
+			log.Printf("[info] received reply for ping of %+v bytes", written)
+			sendCommand(Ping, TCPPackage{CorrelationID: uuid.NewV4()}, connection.Socket)
+			break
+		case 0x0F:
+			log.Fatal("[fatal] bad request sent")
+			break
+		}
 	}
 }
 

@@ -25,4 +25,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("[fatal] %s", err.Error())
 	}
+	select {}
 }
