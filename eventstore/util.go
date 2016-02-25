@@ -13,12 +13,12 @@ func decodeNetUUID(netEncoded []byte) uuid.UUID {
 	id, _ := uuid.FromBytes(uuidBytes)
 	return id
 }
-func encodeNetUUID(uuid uuid.UUID) [16]byte {
+
+func encodeNetUUID(uuid []byte) []byte {
 	var order = [...]int{3, 2, 1, 0, 5, 4, 7, 6, 8, 9, 10, 11, 12, 13, 14, 15}
-	uuidBytes := [16]byte{}
-	bytesToConvert := uuid.Bytes()
+	uuidBytes := make([]byte, 16)
 	for i := 0; i < len(order); i++ {
-		uuidBytes[i] = bytesToConvert[order[i]]
+		uuidBytes[i] = uuid[order[i]]
 	}
 	return uuidBytes
 }

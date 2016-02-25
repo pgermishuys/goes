@@ -1,14 +1,9 @@
 package main
 
 import (
-	// "bytes"
-	// "encoding/binary"
-	"github.com/pgermishuys/goes/eventstore"
-	// "github.com/satori/go.uuid"
-	// "io"
 	"log"
-	// "net"
-	// "os"
+
+	"github.com/pgermishuys/goes/eventstore"
 )
 
 func main() {

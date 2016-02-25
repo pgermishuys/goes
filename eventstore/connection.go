@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/satori/go.uuid"
 	"log"
 	"net"
+
+	"github.com/satori/go.uuid"
 )
 
 type Configuration struct {
 	Address string
 	Port    int
 }
+
 type Connection struct {
 	Config *Configuration
 	Socket *net.TCPConn
@@ -113,19 +115,9 @@ func newPackage(command Command, corrID uuid.UUID, login string, password string
 	return pkg, nil
 }
 
-func (pkg *TCPPackage) bytes() []byte {
-	buf := &bytes.Buffer{}
-	log.Printf("[info] getting bytes from %+v", pkg)
-	err := binary.Write(buf, binary.LittleEndian, pkg)
-	if err != nil {
-		log.Fatalf("[fatal] failed to get bytes for given TCP Package. details: %s", err.Error())
-	}
-	return buf.Bytes()
-}
-
 func sendPackage(pkg TCPPackage, connection *Connection) (int, error) {
 	log.Printf("[info] sending %+v with correlation id : %+v", pkg.Command, pkg.CorrelationID)
-	written, err := connection.Socket.Write(pkg.bytes())
+	err := pkg.write(connection)
 	if err != nil {
 		return 0, err
 	}
