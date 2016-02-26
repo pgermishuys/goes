@@ -1,9 +1,10 @@
 package eventstore
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
+	"log"
 )
 
 // TCPPackage for describing the TCP Package structure from Event Store
@@ -17,33 +18,36 @@ type TCPPackage struct {
 	Data          []byte
 }
 
-// ParseTCPPackage reads the bytes into a TcpPackage
-func parseTCPPackage(reader io.Reader) (TCPPackage, error) {
-	var pkg TCPPackage
-	err := binary.Read(reader, binary.LittleEndian, &pkg.PackageLength)
-	if err != nil {
-		return pkg, err
+func newPackage(command Command, corrID []byte, login string, password string, data []byte) (TCPPackage, error) {
+	var pkg = TCPPackage{
+		Command:       command,
+		CorrelationID: encodeNetUUID(corrID),
+		Flags:         0x00,
 	}
-	err = binary.Read(reader, binary.LittleEndian, &pkg.Command)
-	if err != nil {
-		return pkg, err
+	if len(login) > 0 {
+		pkg.Flags = 0x01
+		pkg.Login = login
+		pkg.Password = password
 	}
-	err = binary.Read(reader, binary.LittleEndian, &pkg.Flags)
+	log.Printf("[info] writing struct into buffer %+v", pkg)
+	buf := &bytes.Buffer{}
+	err := binary.Write(buf, binary.LittleEndian, pkg)
 	if err != nil {
-		return pkg, err
+		log.Fatalf("[fatal] failed to write struct to binary %+v", err.Error())
 	}
-	uuid := make([]byte, 16)
-	err = binary.Read(reader, binary.LittleEndian, uuid)
-	if err != nil {
-		return pkg, err
-	}
-	pkg.CorrelationID = decodeNetUUID(uuid)
+	pkg.PackageLength = uint32(buf.Len())
+	//bug here, this ^^ should be 18
+	pkg.PackageLength = 18
 	return pkg, nil
 }
 
-func (pkg *TCPPackage) write(connection *Connection) error {
-	var writer binary.Writer
+// ParseTCPPackage reads the bytes into a TcpPackage
+func parseTCPPackage(bytes []byte) (TCPPackage, error) {
+	log.Printf("Received bytes %+v", bytes)
+	return TCPPackage{}, nil
+}
 
+func (pkg *TCPPackage) write(connection *Connection) error {
 	loginBytes := []byte(pkg.Login)
 	if len(loginBytes) > 255 {
 		return fmt.Errorf("Login is %d bytes, maximum length 255 bytes", len(loginBytes))
@@ -54,7 +58,7 @@ func (pkg *TCPPackage) write(connection *Connection) error {
 		return fmt.Errorf("Password is %d bytes, maximum length 255 bytes", len(passwordBytes))
 	}
 
-	totalMessageLength := minimumTcpPackageSize +
+	totalMessageLength := minimumTCPPackageSize +
 		1 +
 		len(loginBytes) +
 		1 +
@@ -62,27 +66,51 @@ func (pkg *TCPPackage) write(connection *Connection) error {
 		len(pkg.Data)
 
 	//TODO handle error and nwritten
-	connection.Socket.Write([]byte{
+	_, err := connection.Socket.Write([]byte{
 		byte(totalMessageLength),
 		byte(totalMessageLength >> 8),
 		byte(totalMessageLength >> 16),
 		byte(totalMessageLength >> 24),
 	})
-	connection.Socket.Write([]byte{
+	if err != nil {
+		return err
+	}
+	_, err = connection.Socket.Write([]byte{
 		byte(pkg.Command),
 		byte(pkg.Flags),
 	})
-	connection.Socket.Write(encodeNetUUID(pkg.CorrelationID))
-	connection.Socket.Write([]byte{byte(len(loginBytes))})
-	connection.Socket.Write(loginBytes)
-	connection.Socket.Write([]byte{byte(len(passwordBytes))})
-	connection.Socket.Write(passwordBytes)
-	connection.Socket.Write(pkg.Data)
+	if err != nil {
+		return err
+	}
+	_, err = connection.Socket.Write(encodeNetUUID(pkg.CorrelationID))
+	if err != nil {
+		return err
+	}
+	_, err = connection.Socket.Write([]byte{byte(len(loginBytes))})
+	if err != nil {
+		return err
+	}
+	_, err = connection.Socket.Write(loginBytes)
+	if err != nil {
+		return err
+	}
+	_, err = connection.Socket.Write([]byte{byte(len(passwordBytes))})
+	if err != nil {
+		return err
+	}
+	_, err = connection.Socket.Write(passwordBytes)
+	if err != nil {
+		return err
+	}
+	_, err = connection.Socket.Write(pkg.Data)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-const minimumTcpPackageSize = 0 +
+const minimumTCPPackageSize = 0 +
 	1 + // Command
 	1 + // Flags
 	16 //Correlation ID

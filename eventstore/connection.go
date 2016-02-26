@@ -1,8 +1,6 @@
 package eventstore
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
@@ -64,7 +62,9 @@ func startRead(connection *Connection) {
 		if err != nil {
 			log.Fatal(err.Error())
 		}
-		msg, err := parseTCPPackage(bytes.NewReader(buffer))
+
+		// msg, err := parseTCPPackage(bytes.NewReader(buffer))
+		msg, err := parseTCPPackage(buffer)
 		if err != nil {
 			log.Fatalf("[fatal] could not decode tcp package: %+v\n", err.Error())
 		}
@@ -79,7 +79,7 @@ func startRead(connection *Connection) {
 			break
 		case pong:
 			log.Printf("[info] received reply for ping of %+v bytes", written)
-			pkg, err := newPackage(ping, uuid.NewV4(), "", "", nil)
+			pkg, err := newPackage(ping, uuid.NewV4().Bytes(), "", "", nil)
 			if err != nil {
 				log.Printf("[error] failed to create new heartbeat response package")
 			}
@@ -92,35 +92,11 @@ func startRead(connection *Connection) {
 	}
 }
 
-func newPackage(command Command, corrID uuid.UUID, login string, password string, data []byte) (TCPPackage, error) {
-	var pkg = TCPPackage{
-		Command:       command,
-		CorrelationID: encodeNetUUID(corrID),
-		Flags:         0x00,
-	}
-	if len(login) > 0 {
-		// pkg.Flags = 0x01
-		// pkg.Login = []byte(login)
-		// pkg.Password = []byte(password)
-	}
-	log.Printf("[info] writing struct into buffer %+v", pkg)
-	buf := &bytes.Buffer{}
-	err := binary.Write(buf, binary.LittleEndian, pkg)
-	if err != nil {
-		log.Fatalf("[fatal] failed to write struct to binary %+v", err.Error())
-	}
-	pkg.PackageLength = uint32(buf.Len())
-	//bug here, this ^^ should be 18
-	pkg.PackageLength = 18
-	return pkg, nil
-}
-
-func sendPackage(pkg TCPPackage, connection *Connection) (int, error) {
+func sendPackage(pkg TCPPackage, connection *Connection) error {
 	log.Printf("[info] sending %+v with correlation id : %+v", pkg.Command, pkg.CorrelationID)
 	err := pkg.write(connection)
 	if err != nil {
-		return 0, err
+		return err
 	}
-
-	return written, nil
+	return nil
 }
