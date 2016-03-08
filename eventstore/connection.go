@@ -80,7 +80,7 @@ func startRead(connection *Connection) {
 			log.Printf("[info] received reply for ping of %+v bytes", written)
 			pkg, err := newPackage(ping, uuid.NewV4().Bytes(), "", "", nil)
 			if err != nil {
-				log.Printf("[error] failed to create new heartbeat response package")
+				log.Printf("[error] failed to create new ping response package")
 			}
 			sendPackage(pkg, connection)
 			break
