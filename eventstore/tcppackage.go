@@ -32,7 +32,6 @@ func newPackage(command Command, corrID []byte, login string, password string, d
 	return pkg, nil
 }
 
-// ParseTCPPackage reads the bytes into a TcpPackage
 func parseTCPPackage(packageBytes []byte) (TCPPackage, error) {
 	reader := bytes.NewReader(packageBytes)
 	var pkg TCPPackage
@@ -76,7 +75,7 @@ func (pkg *TCPPackage) write(connection *Connection) error {
 		len(passwordBytes) +
 		len(pkg.Data)
 
-	//TODO handle error and nwritten
+	//TODO handle error and written
 	_, err := connection.Socket.Write([]byte{
 		byte(totalMessageLength),
 		byte(totalMessageLength >> 8),
