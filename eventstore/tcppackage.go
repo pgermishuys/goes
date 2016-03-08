@@ -29,22 +29,33 @@ func newPackage(command Command, corrID []byte, login string, password string, d
 		pkg.Login = login
 		pkg.Password = password
 	}
-	log.Printf("[info] writing struct into buffer %+v", pkg)
-	buf := &bytes.Buffer{}
-	err := binary.Write(buf, binary.LittleEndian, pkg)
-	if err != nil {
-		log.Fatalf("[fatal] failed to write struct to binary %+v", err.Error())
-	}
-	pkg.PackageLength = uint32(buf.Len())
-	//bug here, this ^^ should be 18
-	pkg.PackageLength = 18
 	return pkg, nil
 }
 
 // ParseTCPPackage reads the bytes into a TcpPackage
-func parseTCPPackage(bytes []byte) (TCPPackage, error) {
-	log.Printf("Received bytes %+v", bytes)
-	return TCPPackage{}, nil
+func parseTCPPackage(packageBytes []byte) (TCPPackage, error) {
+	reader := bytes.NewReader(packageBytes)
+	var pkg TCPPackage
+	err := binary.Read(reader, binary.LittleEndian, &pkg.PackageLength)
+	if err != nil {
+		return pkg, err
+	}
+	err = binary.Read(reader, binary.LittleEndian, &pkg.Command)
+	if err != nil {
+		return pkg, err
+	}
+	err = binary.Read(reader, binary.LittleEndian, &pkg.Flags)
+	if err != nil {
+		return pkg, err
+	}
+	uuid := make([]byte, 16)
+	err = binary.Read(reader, binary.LittleEndian, uuid)
+	if err != nil {
+		return pkg, err
+	}
+	pkg.CorrelationID = decodeNetUUID(uuid)
+	log.Printf("[info] received package: %+v", pkg)
+	return pkg, nil
 }
 
 func (pkg *TCPPackage) write(connection *Connection) error {

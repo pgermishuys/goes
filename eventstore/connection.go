@@ -57,14 +57,13 @@ func NewConnection(config *Configuration) (*Connection, error) {
 func startRead(connection *Connection) {
 	buffer := make([]byte, 1024)
 	for {
-		fmt.Println("[info] heartbeat")
 		written, err := connection.Socket.Read(buffer)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
 
-		// msg, err := parseTCPPackage(bytes.NewReader(buffer))
 		msg, err := parseTCPPackage(buffer)
+		log.Printf("[info] received package : %+v", msg)
 		if err != nil {
 			log.Fatalf("[fatal] could not decode tcp package: %+v\n", err.Error())
 		}
