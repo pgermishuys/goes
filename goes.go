@@ -22,10 +22,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("[fatal] %s", err.Error())
 	}
-	eventID, _ := uuid.FromString("2499b281-de4f-43cb-93dc-19912736b4f6")
 	events := []*NewEvent{
 		&NewEvent{
-			EventId:             eventstore.EncodeNetUUID(eventID.Bytes()),
+			EventId:             eventstore.EncodeNetUUID(uuid.NewV4().Bytes()),
 			EventType:           proto.String("eventtype"),
 			DataContentType:     proto.Int32(1),
 			MetadataContentType: proto.Int32(0),
