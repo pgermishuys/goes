@@ -21,8 +21,9 @@ type TCPPackage struct {
 func newPackage(command Command, corrID []byte, login string, password string, data []byte) (TCPPackage, error) {
 	var pkg = TCPPackage{
 		Command:       command,
-		CorrelationID: encodeNetUUID(corrID),
+		CorrelationID: corrID,
 		Flags:         0x00,
+		Data:          data,
 	}
 	if len(login) > 0 {
 		pkg.Flags = 0x01
@@ -52,20 +53,20 @@ func parseTCPPackage(packageBytes []byte) (TCPPackage, error) {
 	if err != nil {
 		return pkg, err
 	}
-	pkg.CorrelationID = decodeNetUUID(uuid)
-	log.Printf("[info] received package: %+v", pkg)
+	pkg.CorrelationID = DecodeNetUUID(uuid)
+	log.Printf("[info] parsed package: %+v\n", pkg)
 	return pkg, nil
 }
 
 func (pkg *TCPPackage) write(connection *Connection) error {
 	loginBytes := []byte(pkg.Login)
 	if len(loginBytes) > 255 {
-		return fmt.Errorf("Login is %d bytes, maximum length 255 bytes", len(loginBytes))
+		return fmt.Errorf("login is %d bytes, maximum length 255 bytes", len(loginBytes))
 	}
 
 	passwordBytes := []byte(pkg.Password)
 	if len(passwordBytes) > 255 {
-		return fmt.Errorf("Password is %d bytes, maximum length 255 bytes", len(passwordBytes))
+		return fmt.Errorf("password is %d bytes, maximum length 255 bytes", len(passwordBytes))
 	}
 
 	totalMessageLength := minimumTCPPackageSize +
@@ -92,7 +93,7 @@ func (pkg *TCPPackage) write(connection *Connection) error {
 	if err != nil {
 		return err
 	}
-	_, err = connection.Socket.Write(encodeNetUUID(pkg.CorrelationID))
+	_, err = connection.Socket.Write(EncodeNetUUID(pkg.CorrelationID))
 	if err != nil {
 		return err
 	}
@@ -116,7 +117,7 @@ func (pkg *TCPPackage) write(connection *Connection) error {
 	if err != nil {
 		return err
 	}
-
+	fmt.Printf("[info] wrote %+v bytes", totalMessageLength)
 	return nil
 }
 

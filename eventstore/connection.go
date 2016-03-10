@@ -20,15 +20,15 @@ type Connection struct {
 
 // Connect attempts to connect to Event Store using the given configuration
 func (connection *Connection) Connect() error {
-	log.Print("[info] connecting to event store...")
+	log.Print("[info] connecting to event store...\n")
 
 	address := fmt.Sprintf("%s:%v", connection.Config.Address, connection.Config.Port)
 	resolvedAddress, _ := net.ResolveTCPAddr("tcp", address)
 	conn, err := net.DialTCP("tcp", nil, resolvedAddress)
 	if err != nil {
-		return fmt.Errorf("failed to connect to event store on %+v. details: %s", address, err.Error())
+		return fmt.Errorf("failed to connect to event store on %+v. details: %s\n", address, err.Error())
 	}
-	log.Printf("[info] succesfully connected to event store on %s", address)
+	log.Printf("[info] succesfully connected to event store on %s\n", address)
 	connection.Socket = conn
 
 	go startRead(connection)
@@ -37,7 +37,7 @@ func (connection *Connection) Connect() error {
 
 // Close attempts to close the connection to Event Store
 func (connection *Connection) Close() error {
-	log.Print("[info] closing the connection to event store...")
+	log.Print("[info] closing the connection to event store...\n'")
 	return connection.Socket.Close()
 }
 
@@ -63,21 +63,20 @@ func startRead(connection *Connection) {
 		}
 
 		msg, err := parseTCPPackage(buffer)
-		log.Printf("[info] received package : %+v", msg)
 		if err != nil {
 			log.Fatalf("[fatal] could not decode tcp package: %+v\n", err.Error())
 		}
 		switch msg.Command {
 		case heartbeatRequest:
-			log.Printf("[info] received heartbeat request of %+v bytes", written)
+			log.Printf("[info] received heartbeat request of %+v bytes\n", written)
 			pkg, err := newPackage(heartbeatResponse, msg.CorrelationID, "", "", nil)
 			if err != nil {
-				log.Printf("[error] failed to create new heartbeat response package")
+				log.Printf("[error] failed to create new heartbeat response package\n")
 			}
 			sendPackage(pkg, connection)
 			break
 		case pong:
-			log.Printf("[info] received reply for ping of %+v bytes", written)
+			log.Printf("[info] received reply for ping of %+v bytes\n", written)
 			pkg, err := newPackage(ping, uuid.NewV4().Bytes(), "", "", nil)
 			if err != nil {
 				log.Printf("[error] failed to create new ping response package")
@@ -92,7 +91,7 @@ func startRead(connection *Connection) {
 }
 
 func sendPackage(pkg TCPPackage, connection *Connection) error {
-	log.Printf("[info] sending %+v with correlation id : %+v", pkg.Command, pkg.CorrelationID)
+	log.Printf("[info] sending %+v with correlation id : %+v\n", pkg.Command, pkg.CorrelationID)
 	err := pkg.write(connection)
 	if err != nil {
 		return err
