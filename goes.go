@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/pgermishuys/goes/eventstore"
 	"github.com/satori/go.uuid"
 )
@@ -22,27 +21,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("[fatal] %s", err.Error())
 	}
-	events := []*NewEvent{
-		&NewEvent{
-			EventId:             eventstore.EncodeNetUUID(uuid.NewV4().Bytes()),
-			EventType:           proto.String("eventtype"),
-			DataContentType:     proto.Int32(1),
-			MetadataContentType: proto.Int32(0),
-			Data:                []byte("data"),
-			Metadata:            []byte("metadata"),
+	events := []eventstore.Event{
+		eventstore.Event{
+			EventID:   uuid.NewV4(),
+			EventType: "itemAdded",
+			IsJSON:    true,
+			Data:      []byte("{\"price\": \"100\"}"),
+			Metadata:  []byte("metadata"),
 		},
 	}
-	writeEvents := &WriteEvents{
-		EventStreamId:   proto.String("streamid"),
-		ExpectedVersion: proto.Int32(-2),
-		Events:          events,
-		RequireMaster:   proto.Bool(true),
-	}
-	data, err := proto.Marshal(writeEvents)
-	if err != nil {
-		log.Fatal("marshaling error: ", err)
-	}
-	log.Printf("[info] protobuf data is %+v bytes", len(data))
-	eventstore.AppendToStream(conn, "stream", -1, data)
+	go eventstore.AppendToStream(conn, "shoppingCart-1", -2, events)
+	go eventstore.ReadSingleEvent(conn, "$stats-127.0.0.1:2113", 0, true, true)
 	select {}
 }

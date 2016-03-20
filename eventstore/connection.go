@@ -14,12 +14,14 @@ type Configuration struct {
 }
 
 type Connection struct {
-	Config *Configuration
-	Socket *net.TCPConn
+	Config   *Configuration
+	Socket   *net.TCPConn
+	requests map[uuid.UUID]chan<- TCPPackage
 }
 
 // Connect attempts to connect to Event Store using the given configuration
 func (connection *Connection) Connect() error {
+	connection.requests = make(map[uuid.UUID]chan<- TCPPackage)
 	log.Print("[info] connecting to event store...\n")
 
 	address := fmt.Sprintf("%s:%v", connection.Config.Address, connection.Config.Port)
@@ -55,33 +57,43 @@ func NewConnection(config *Configuration) (*Connection, error) {
 }
 
 func startRead(connection *Connection) {
-	buffer := make([]byte, 1024)
+	buffer := make([]byte, 40000)
 	for {
-		written, err := connection.Socket.Read(buffer)
+		_, err := connection.Socket.Read(buffer)
+		fmt.Printf("[info] received a package of length: %+v\n", buffer[0])
 		if err != nil {
 			log.Fatal(err.Error())
 		}
 
-		msg, err := parseTCPPackage(buffer)
+		msg, err := parsePackage(buffer)
 		if err != nil {
 			log.Fatalf("[fatal] could not decode tcp package: %+v\n", err.Error())
 		}
 		switch msg.Command {
 		case heartbeatRequest:
-			log.Printf("[info] received heartbeat request of %+v bytes\n", written)
+			// log.Printf("[info] received heartbeat request of %+v bytes\n", written)
 			pkg, err := newPackage(heartbeatResponse, msg.CorrelationID, "", "", nil)
 			if err != nil {
 				log.Printf("[error] failed to create new heartbeat response package\n")
 			}
-			sendPackage(pkg, connection)
+			channel := make(chan<- TCPPackage)
+			go sendPackage(pkg, connection, channel)
 			break
 		case pong:
-			log.Printf("[info] received reply for ping of %+v bytes\n", written)
 			pkg, err := newPackage(ping, uuid.NewV4().Bytes(), "", "", nil)
 			if err != nil {
 				log.Printf("[error] failed to create new ping response package")
 			}
-			sendPackage(pkg, connection)
+			channel := make(chan<- TCPPackage)
+			go sendPackage(pkg, connection, channel)
+			break
+		case writeEventsCompleted:
+			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
+			connection.requests[correlationID] <- msg
+			break
+		case readEventCompleted:
+			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
+			connection.requests[correlationID] <- msg
 			break
 		case 0x0F:
 			log.Fatal("[fatal] bad request sent")
@@ -90,8 +102,9 @@ func startRead(connection *Connection) {
 	}
 }
 
-func sendPackage(pkg TCPPackage, connection *Connection) error {
-	log.Printf("[info] sending %+v with correlation id : %+v\n", pkg.Command, pkg.CorrelationID)
+func sendPackage(pkg TCPPackage, connection *Connection, channel chan<- TCPPackage) error {
+	correlationID, _ := uuid.FromBytes(pkg.CorrelationID)
+	connection.requests[correlationID] = channel
 	err := pkg.write(connection)
 	if err != nil {
 		return err

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
 )
 
 // TCPPackage for describing the TCP Package structure from Event Store
@@ -33,7 +32,7 @@ func newPackage(command Command, corrID []byte, login string, password string, d
 	return pkg, nil
 }
 
-func parseTCPPackage(packageBytes []byte) (TCPPackage, error) {
+func parsePackage(packageBytes []byte) (TCPPackage, error) {
 	reader := bytes.NewReader(packageBytes)
 	var pkg TCPPackage
 	err := binary.Read(reader, binary.LittleEndian, &pkg.PackageLength)
@@ -54,7 +53,14 @@ func parseTCPPackage(packageBytes []byte) (TCPPackage, error) {
 		return pkg, err
 	}
 	pkg.CorrelationID = DecodeNetUUID(uuid)
-	log.Printf("[info] parsed package: %+v\n", pkg)
+
+	dataSize := pkg.PackageLength - minimumTCPPackageSize
+	data := make([]byte, dataSize)
+	err = binary.Read(reader, binary.LittleEndian, data)
+	if err != nil {
+		return pkg, err
+	}
+	pkg.Data = data
 	return pkg, nil
 }
 
@@ -117,7 +123,7 @@ func (pkg *TCPPackage) write(connection *Connection) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("[info] wrote %+v bytes", totalMessageLength)
+	fmt.Printf("[info] wrote %+v bytes\n", totalMessageLength)
 	return nil
 }
 

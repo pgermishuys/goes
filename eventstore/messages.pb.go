@@ -49,7 +49,7 @@ It has these top-level messages:
 	ScavengeDatabase
 	ScavengeDatabaseCompleted
 */
-package main
+package eventstore
 
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
