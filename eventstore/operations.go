@@ -1,21 +1,22 @@
-package eventstore
+package goes
 
 import (
 	"log"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/pgermishuys/goes/protobuf"
 	"github.com/satori/go.uuid"
 )
 
-func AppendToStream(conn *Connection, streamID string, expectedVersion int32, evnts []Event) (WriteEventsCompleted, error) {
-	var events []*NewEvent
+func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion int32, evnts []Event) (protobuf.WriteEventsCompleted, error) {
+	var events []*protobuf.NewEvent
 	for _, evnt := range evnts {
 		dataContentType := int32(0)
 		if evnt.IsJSON == true {
 			dataContentType = 1
 		}
 		events = append(events,
-			&NewEvent{
+			&protobuf.NewEvent{
 				EventId:             EncodeNetUUID(evnt.EventID.Bytes()),
 				EventType:           proto.String(evnt.EventType),
 				DataContentType:     proto.Int32(dataContentType),
@@ -25,7 +26,7 @@ func AppendToStream(conn *Connection, streamID string, expectedVersion int32, ev
 			},
 		)
 	}
-	writeEventsData := &WriteEvents{
+	writeEventsData := &protobuf.WriteEvents{
 		EventStreamId:   proto.String(streamID),
 		ExpectedVersion: proto.Int32(expectedVersion),
 		Events:          events,
@@ -43,14 +44,14 @@ func AppendToStream(conn *Connection, streamID string, expectedVersion int32, ev
 	resultChan := make(chan TCPPackage)
 	sendPackage(pkg, conn, resultChan)
 	result := <-resultChan
-	complete := &WriteEventsCompleted{}
+	complete := &protobuf.WriteEventsCompleted{}
 	proto.Unmarshal(result.Data, complete)
 	log.Printf("[info] WriteEventsCompleted: %+v\n", complete)
-	return WriteEventsCompleted{}, nil
+	return protobuf.WriteEventsCompleted{}, nil
 }
 
-func ReadSingleEvent(conn *Connection, streamID string, eventNumber int32, resolveLinkTos bool, requireMaster bool) (ReadEventCompleted, error) {
-	readEventsData := &ReadEvent{
+func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber int32, resolveLinkTos bool, requireMaster bool) (protobuf.ReadEventCompleted, error) {
+	readEventsData := &protobuf.ReadEvent{
 		EventStreamId:  proto.String(streamID),
 		EventNumber:    proto.Int32(eventNumber),
 		ResolveLinkTos: proto.Bool(resolveLinkTos),
@@ -68,7 +69,7 @@ func ReadSingleEvent(conn *Connection, streamID string, eventNumber int32, resol
 	resultChan := make(chan TCPPackage)
 	sendPackage(pkg, conn, resultChan)
 	result := <-resultChan
-	complete := &ReadEventCompleted{}
+	complete := &protobuf.ReadEventCompleted{}
 	proto.Unmarshal(result.Data, complete)
-	return ReadEventCompleted{}, nil
+	return protobuf.ReadEventCompleted{}, nil
 }

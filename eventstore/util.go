@@ -1,4 +1,4 @@
-package eventstore
+package goes
 
 func DecodeNetUUID(netEncoded []byte) []byte {
 	var order = [...]int{3, 2, 1, 0, 5, 4, 7, 6, 8, 9, 10, 11, 12, 13, 14, 15}

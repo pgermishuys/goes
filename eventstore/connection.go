@@ -1,4 +1,4 @@
-package eventstore
+package goes
 
 import (
 	"fmt"
@@ -13,14 +13,14 @@ type Configuration struct {
 	Port    int
 }
 
-type Connection struct {
+type EventStoreConnection struct {
 	Config   *Configuration
 	Socket   *net.TCPConn
 	requests map[uuid.UUID]chan<- TCPPackage
 }
 
 // Connect attempts to connect to Event Store using the given configuration
-func (connection *Connection) Connect() error {
+func (connection *EventStoreConnection) Connect() error {
 	connection.requests = make(map[uuid.UUID]chan<- TCPPackage)
 	log.Print("[info] connecting to event store...\n")
 
@@ -38,25 +38,25 @@ func (connection *Connection) Connect() error {
 }
 
 // Close attempts to close the connection to Event Store
-func (connection *Connection) Close() error {
+func (connection *EventStoreConnection) Close() error {
 	log.Print("[info] closing the connection to event store...\n'")
 	return connection.Socket.Close()
 }
 
 // NewConnection sets up a new Event Store Connection but does not open the connection
-func NewConnection(config *Configuration) (*Connection, error) {
+func NewEventStoreConnection(config *Configuration) (*EventStoreConnection, error) {
 	if len(config.Address) == 0 {
 		return nil, fmt.Errorf("The address (%v) cannot be an empty string", config.Address)
 	}
 	if config.Port <= 0 {
 		return nil, fmt.Errorf("The port (%v) cannot be less or equal to 0", config.Port)
 	}
-	return &Connection{
+	return &EventStoreConnection{
 		Config: config,
 	}, nil
 }
 
-func startRead(connection *Connection) {
+func startRead(connection *EventStoreConnection) {
 	buffer := make([]byte, 40000)
 	for {
 		_, err := connection.Socket.Read(buffer)
@@ -102,7 +102,7 @@ func startRead(connection *Connection) {
 	}
 }
 
-func sendPackage(pkg TCPPackage, connection *Connection, channel chan<- TCPPackage) error {
+func sendPackage(pkg TCPPackage, connection *EventStoreConnection, channel chan<- TCPPackage) error {
 	correlationID, _ := uuid.FromBytes(pkg.CorrelationID)
 	connection.requests[correlationID] = channel
 	err := pkg.write(connection)

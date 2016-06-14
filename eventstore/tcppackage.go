@@ -1,4 +1,4 @@
-package eventstore
+package goes
 
 import (
 	"bytes"
@@ -64,7 +64,7 @@ func parsePackage(packageBytes []byte) (TCPPackage, error) {
 	return pkg, nil
 }
 
-func (pkg *TCPPackage) write(connection *Connection) error {
+func (pkg *TCPPackage) write(connection *EventStoreConnection) error {
 	loginBytes := []byte(pkg.Login)
 	if len(loginBytes) > 255 {
 		return fmt.Errorf("login is %d bytes, maximum length 255 bytes", len(loginBytes))
