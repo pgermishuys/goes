@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 
+	"sync"
+
 	"github.com/satori/go.uuid"
 )
 
@@ -14,15 +16,18 @@ type Configuration struct {
 }
 
 type EventStoreConnection struct {
-	Config   *Configuration
-	Socket   *net.TCPConn
-	requests map[uuid.UUID]chan<- TCPPackage
+	Config       *Configuration
+	Socket       *net.TCPConn
+	connected    bool
+	requests     map[uuid.UUID]chan<- TCPPackage
+	ConnectionId uuid.UUID
+	Mutex        *sync.Mutex
 }
 
 // Connect attempts to connect to Event Store using the given configuration
 func (connection *EventStoreConnection) Connect() error {
 	connection.requests = make(map[uuid.UUID]chan<- TCPPackage)
-	log.Print("[info] connecting to event store...\n")
+	log.Printf("[info] connecting (id: %+v) to event store...\n", connection.ConnectionId)
 
 	address := fmt.Sprintf("%s:%v", connection.Config.Address, connection.Config.Port)
 	resolvedAddress, _ := net.ResolveTCPAddr("tcp", address)
@@ -30,17 +35,26 @@ func (connection *EventStoreConnection) Connect() error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to event store on %+v. details: %s\n", address, err.Error())
 	}
-	log.Printf("[info] succesfully connected to event store on %s\n", address)
+	log.Printf("[info] succesfully connected to event store on %s (id: %+v)\n", address, connection.ConnectionId)
 	connection.Socket = conn
+	connection.connected = true
 
-	go startRead(connection)
+	go readFromSocket(connection)
 	return nil
 }
 
 // Close attempts to close the connection to Event Store
 func (connection *EventStoreConnection) Close() error {
-	log.Print("[info] closing the connection to event store...\n'")
-	return connection.Socket.Close()
+	connection.Mutex.Lock()
+	connection.connected = false
+	connection.Mutex.Unlock()
+	log.Printf("[info] closing the connection (id: %+v) to event store...\n'", connection.ConnectionId)
+	err := connection.Socket.Close()
+	connection.Socket = nil
+	if err != nil {
+		log.Printf("[error] failed closing the connection to event store...%+v\n'", err)
+	}
+	return err
 }
 
 // NewConnection sets up a new Event Store Connection but does not open the connection
@@ -51,18 +65,29 @@ func NewEventStoreConnection(config *Configuration) (*EventStoreConnection, erro
 	if config.Port <= 0 {
 		return nil, fmt.Errorf("The port (%v) cannot be less or equal to 0", config.Port)
 	}
-	return &EventStoreConnection{
-		Config: config,
-	}, nil
+	conn := &EventStoreConnection{
+		Config:       config,
+		ConnectionId: uuid.NewV4(),
+		Mutex:        &sync.Mutex{},
+	}
+	log.Printf("[info] created new event store connection : %+v", conn)
+	return conn, nil
 }
 
-func startRead(connection *EventStoreConnection) {
+func readFromSocket(connection *EventStoreConnection) {
 	buffer := make([]byte, 40000)
 	for {
+		connection.Mutex.Lock()
+		if connection.connected == false {
+			break
+		}
+		connection.Mutex.Unlock()
 		_, err := connection.Socket.Read(buffer)
-		fmt.Printf("[info] received a package of length: %+v\n", buffer[0])
 		if err != nil {
-			log.Fatal(err.Error())
+			if connection.connected {
+				log.Fatalf("[fatal] (id: %+v) failed to read with %+v\n", connection.ConnectionId, err.Error())
+			}
+			break
 		}
 
 		msg, err := parsePackage(buffer)

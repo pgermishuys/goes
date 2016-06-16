@@ -47,7 +47,7 @@ func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion
 	complete := &protobuf.WriteEventsCompleted{}
 	proto.Unmarshal(result.Data, complete)
 	log.Printf("[info] WriteEventsCompleted: %+v\n", complete)
-	return protobuf.WriteEventsCompleted{}, nil
+	return *complete, nil
 }
 
 func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber int32, resolveLinkTos bool, requireMaster bool) (protobuf.ReadEventCompleted, error) {
