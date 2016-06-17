@@ -71,5 +71,9 @@ func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber in
 	result := <-resultChan
 	complete := &protobuf.ReadEventCompleted{}
 	proto.Unmarshal(result.Data, complete)
-	return protobuf.ReadEventCompleted{}, nil
+	log.Printf("[info] ReadEventCompleted: %+v\n", complete)
+	if complete.GetResult() == protobuf.ReadEventCompleted_Success {
+		complete.Event.Event.EventId = DecodeNetUUID(complete.Event.Event.EventId)
+	}
+	return *complete, nil
 }
