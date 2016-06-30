@@ -77,3 +77,29 @@ func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber in
 	}
 	return *complete, nil
 }
+
+func DeleteStream(conn *EventStoreConnection, streamID string, expectedVersion int32, requireMaster bool, hardDelete bool) (protobuf.DeleteStreamCompleted, error) {
+	deleteStreamData := &protobuf.DeleteStream{
+		EventStreamId:   proto.String(streamID),
+		ExpectedVersion: proto.Int32(expectedVersion),
+		RequireMaster:   proto.Bool(requireMaster),
+		HardDelete:      proto.Bool(hardDelete),
+	}
+	data, err := proto.Marshal(deleteStreamData)
+	if err != nil {
+		log.Fatal("marshaling error: ", err)
+	}
+
+	log.Printf("[info] Deleting Stream: %+v\n", deleteStreamData)
+	pkg, err := newPackage(deleteStream, uuid.NewV4().Bytes(), "admin", "changeit", data)
+	if err != nil {
+		log.Printf("[error] failed to create new delete stream package")
+	}
+	resultChan := make(chan TCPPackage)
+	sendPackage(pkg, conn, resultChan)
+	result := <-resultChan
+	complete := &protobuf.DeleteStreamCompleted{}
+	proto.Unmarshal(result.Data, complete)
+	log.Printf("[info] DeleteStreamCompleted: %+v\n", complete)
+	return *complete, nil
+}

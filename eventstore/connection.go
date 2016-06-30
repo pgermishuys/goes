@@ -120,6 +120,10 @@ func readFromSocket(connection *EventStoreConnection) {
 			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
 			connection.requests[correlationID] <- msg
 			break
+		case deleteStreamCompleted:
+			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
+			connection.requests[correlationID] <- msg
+			break
 		case 0x0F:
 			log.Fatal("[fatal] bad request sent")
 			break
