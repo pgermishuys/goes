@@ -86,7 +86,7 @@ func readFromSocket(connection *EventStoreConnection) {
 		connection.Mutex.Unlock()
 		_, err := connection.Socket.Read(buffer)
 		if err != nil {
-			if connection.connected {
+			if connection.connected && err.Error() != "EOF" {
 				log.Fatalf("[fatal] (id: %+v) failed to read with %+v\n", connection.ConnectionID, err.Error())
 			}
 			break
@@ -98,7 +98,6 @@ func readFromSocket(connection *EventStoreConnection) {
 		}
 		switch msg.Command {
 		case heartbeatRequest:
-			// log.Printf("[info] received heartbeat request of %+v bytes\n", written)
 			pkg, err := newPackage(heartbeatResponse, msg.CorrelationID, "", "", nil)
 			if err != nil {
 				log.Printf("[error] failed to create new heartbeat response package\n")
@@ -115,32 +114,16 @@ func readFromSocket(connection *EventStoreConnection) {
 			go sendPackage(pkg, connection, channel)
 			break
 		case writeEventsCompleted:
-			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
-			connection.requests[correlationID] <- msg
-			break
 		case readEventCompleted:
-			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
-			connection.requests[correlationID] <- msg
-			break
 		case deleteStreamCompleted:
-			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
-			connection.requests[correlationID] <- msg
-			break
 		case readStreamEventsForwardCompleted:
-			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
-			connection.requests[correlationID] <- msg
-			break
 		case readStreamEventsBackwardCompleted:
-			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
-			connection.requests[correlationID] <- msg
-			break
 		case subscriptionConfirmation:
-			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
-			connection.requests[correlationID] <- msg
-			break
 		case streamEventAppeared:
 			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
-			connection.requests[correlationID] <- msg
+			if request, ok := connection.requests[correlationID]; ok {
+				request <- msg
+			}
 			break
 		case 0x0F:
 			log.Fatal("[fatal] bad request sent")
