@@ -16,18 +16,20 @@ type Configuration struct {
 }
 
 type EventStoreConnection struct {
-	Config       *Configuration
-	Socket       *net.TCPConn
-	connected    bool
-	requests     map[uuid.UUID]chan<- TCPPackage
-	ConnectionId uuid.UUID
-	Mutex        *sync.Mutex
+	Config        *Configuration
+	Socket        *net.TCPConn
+	connected     bool
+	requests      map[uuid.UUID]chan<- TCPPackage
+	subscriptions map[uuid.UUID]*Subscription
+	ConnectionID  uuid.UUID
+	Mutex         *sync.Mutex
 }
 
 // Connect attempts to connect to Event Store using the given configuration
 func (connection *EventStoreConnection) Connect() error {
 	connection.requests = make(map[uuid.UUID]chan<- TCPPackage)
-	log.Printf("[info] connecting (id: %+v) to event store...\n", connection.ConnectionId)
+	connection.subscriptions = make(map[uuid.UUID]*Subscription)
+	log.Printf("[info] connecting (id: %+v) to event store...\n", connection.ConnectionID)
 
 	address := fmt.Sprintf("%s:%v", connection.Config.Address, connection.Config.Port)
 	resolvedAddress, _ := net.ResolveTCPAddr("tcp", address)
@@ -35,7 +37,7 @@ func (connection *EventStoreConnection) Connect() error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to event store on %+v. details: %s\n", address, err.Error())
 	}
-	log.Printf("[info] succesfully connected to event store on %s (id: %+v)\n", address, connection.ConnectionId)
+	log.Printf("[info] successfully connected to event store on %s (id: %+v)\n", address, connection.ConnectionID)
 	connection.Socket = conn
 	connection.connected = true
 
@@ -48,7 +50,7 @@ func (connection *EventStoreConnection) Close() error {
 	connection.Mutex.Lock()
 	connection.connected = false
 	connection.Mutex.Unlock()
-	log.Printf("[info] closing the connection (id: %+v) to event store...\n'", connection.ConnectionId)
+	log.Printf("[info] closing the connection (id: %+v) to event store...\n'", connection.ConnectionID)
 	err := connection.Socket.Close()
 	connection.Socket = nil
 	if err != nil {
@@ -67,7 +69,7 @@ func NewEventStoreConnection(config *Configuration) (*EventStoreConnection, erro
 	}
 	conn := &EventStoreConnection{
 		Config:       config,
-		ConnectionId: uuid.NewV4(),
+		ConnectionID: uuid.NewV4(),
 		Mutex:        &sync.Mutex{},
 	}
 	log.Printf("[info] created new event store connection : %+v", conn)
@@ -85,7 +87,7 @@ func readFromSocket(connection *EventStoreConnection) {
 		_, err := connection.Socket.Read(buffer)
 		if err != nil {
 			if connection.connected {
-				log.Fatalf("[fatal] (id: %+v) failed to read with %+v\n", connection.ConnectionId, err.Error())
+				log.Fatalf("[fatal] (id: %+v) failed to read with %+v\n", connection.ConnectionID, err.Error())
 			}
 			break
 		}
@@ -121,6 +123,22 @@ func readFromSocket(connection *EventStoreConnection) {
 			connection.requests[correlationID] <- msg
 			break
 		case deleteStreamCompleted:
+			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
+			connection.requests[correlationID] <- msg
+			break
+		case readStreamEventsForwardCompleted:
+			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
+			connection.requests[correlationID] <- msg
+			break
+		case readStreamEventsBackwardCompleted:
+			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
+			connection.requests[correlationID] <- msg
+			break
+		case subscriptionConfirmation:
+			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
+			connection.requests[correlationID] <- msg
+			break
+		case streamEventAppeared:
 			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
 			connection.requests[correlationID] <- msg
 			break

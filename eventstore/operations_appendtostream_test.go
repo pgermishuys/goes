@@ -79,7 +79,7 @@ func TestAppendToStream_MultipleEvents(t *testing.T) {
 	}
 }
 
-func TestAppendToStream_WithInvalidExpectedVersion_Returns_WrongExpectedVersion(t *testing.T) {
+func TestAppendToStream_WithInvalidExpectedVersion(t *testing.T) {
 	conn := createTestConnection(t)
 	defer conn.Close()
 	events := []goes.Event{

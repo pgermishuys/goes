@@ -103,3 +103,106 @@ func DeleteStream(conn *EventStoreConnection, streamID string, expectedVersion i
 	log.Printf("[info] DeleteStreamCompleted: %+v\n", complete)
 	return *complete, nil
 }
+
+func ReadStreamEventsForward(conn *EventStoreConnection, streamID string, from int32, maxCount int32, resolveLinkTos bool, requireMaster bool) (protobuf.ReadStreamEventsCompleted, error) {
+	readStreamEventsForwardData := &protobuf.ReadStreamEvents{
+		EventStreamId:   proto.String(streamID),
+		FromEventNumber: proto.Int32(from),
+		MaxCount:        proto.Int32(maxCount),
+		ResolveLinkTos:  proto.Bool(resolveLinkTos),
+		RequireMaster:   proto.Bool(requireMaster),
+	}
+	data, err := proto.Marshal(readStreamEventsForwardData)
+	if err != nil {
+		log.Fatal("marshaling error: ", err)
+	}
+
+	log.Printf("[info] Read Stream Forward: %+v\n", readStreamEventsForwardData)
+	pkg, err := newPackage(readStreamEventsForward, uuid.NewV4().Bytes(), "admin", "changeit", data)
+	if err != nil {
+		log.Printf("[error] failed to create new read events forward stream package")
+	}
+	resultChan := make(chan TCPPackage)
+	sendPackage(pkg, conn, resultChan)
+	result := <-resultChan
+	complete := &protobuf.ReadStreamEventsCompleted{}
+	proto.Unmarshal(result.Data, complete)
+	log.Printf("[info] ReadStreamEventsForwardCompleted: %+v\n", complete)
+	if complete.GetResult() == protobuf.ReadStreamEventsCompleted_Success {
+		for _, evnt := range complete.GetEvents() {
+			evnt.Event.EventId = DecodeNetUUID(evnt.Event.EventId)
+			if evnt.Link != nil {
+				evnt.Link.EventId = DecodeNetUUID(evnt.Link.EventId)
+			}
+		}
+	}
+	return *complete, nil
+}
+
+func ReadStreamEventsBackward(conn *EventStoreConnection, streamID string, from int32, maxCount int32, resolveLinkTos bool, requireMaster bool) (protobuf.ReadStreamEventsCompleted, error) {
+	readStreamEventsBackwardData := &protobuf.ReadStreamEvents{
+		EventStreamId:   proto.String(streamID),
+		FromEventNumber: proto.Int32(from),
+		MaxCount:        proto.Int32(maxCount),
+		ResolveLinkTos:  proto.Bool(resolveLinkTos),
+		RequireMaster:   proto.Bool(requireMaster),
+	}
+	data, err := proto.Marshal(readStreamEventsBackwardData)
+	if err != nil {
+		log.Fatal("marshaling error: ", err)
+	}
+
+	log.Printf("[info] Read Stream Backward: %+v\n", readStreamEventsBackwardData)
+	pkg, err := newPackage(readStreamEventsBackward, uuid.NewV4().Bytes(), "admin", "changeit", data)
+	if err != nil {
+		log.Printf("[error] failed to create new read events backward stream package")
+	}
+	resultChan := make(chan TCPPackage)
+	sendPackage(pkg, conn, resultChan)
+	result := <-resultChan
+	complete := &protobuf.ReadStreamEventsCompleted{}
+	proto.Unmarshal(result.Data, complete)
+	log.Printf("[info] ReadStreamEventsBackwardCompleted: %+v\n", complete)
+	if complete.GetResult() == protobuf.ReadStreamEventsCompleted_Success {
+		for _, evnt := range complete.GetEvents() {
+			evnt.Event.EventId = DecodeNetUUID(evnt.Event.EventId)
+			if evnt.Link != nil {
+				evnt.Link.EventId = DecodeNetUUID(evnt.Link.EventId)
+			}
+		}
+	}
+	return *complete, nil
+}
+
+type eventAppeared func(*protobuf.StreamEventAppeared)
+type dropped func(*protobuf.SubscriptionDropped)
+
+func SubscribeToStream(conn *EventStoreConnection, streamID string, resolveLinkTos bool, eventAppeared eventAppeared, dropped dropped) (*Subscription, error) {
+	subscriptionData := &protobuf.SubscribeToStream{
+		EventStreamId:  proto.String(streamID),
+		ResolveLinkTos: proto.Bool(resolveLinkTos),
+	}
+	data, err := proto.Marshal(subscriptionData)
+	if err != nil {
+		log.Fatal("marshaling error: ", err)
+	}
+
+	log.Printf("[info] Subscription Data: %+v\n", subscriptionData)
+	correlationID := uuid.NewV4()
+	pkg, err := newPackage(subscribeToStream, correlationID.Bytes(), "admin", "changeit", data)
+	if err != nil {
+		log.Printf("[error] failed to subscribe to stream package")
+	}
+	resultChan := make(chan TCPPackage)
+	sendPackage(pkg, conn, resultChan)
+	result := <-resultChan
+	subscriptionConfirmation := &protobuf.SubscriptionConfirmation{}
+	proto.Unmarshal(result.Data, subscriptionConfirmation)
+	log.Printf("[info] SubscribeToStream: %+v\n", subscriptionConfirmation)
+	subscription, err := NewSubscription(conn, correlationID, resultChan, eventAppeared, dropped)
+	if err != nil {
+		log.Printf("[error] Failed to create new subscription: %+v\n", err)
+	}
+	conn.subscriptions[correlationID] = subscription
+	return subscription, nil
+}
