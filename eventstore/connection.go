@@ -89,6 +89,10 @@ func readFromSocket(connection *EventStoreConnection) {
 			if connection.connected && err.Error() != "EOF" {
 				log.Fatalf("[fatal] (id: %+v) failed to read with %+v\n", connection.ConnectionID, err.Error())
 			}
+			if err.Error() == "EOF" {
+				connection.Close()
+				connection.Connect()
+			}
 			break
 		}
 

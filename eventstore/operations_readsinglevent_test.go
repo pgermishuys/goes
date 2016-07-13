@@ -48,7 +48,6 @@ func TestReadSinglEvent_WithEventsInStream(t *testing.T) {
 	if result.GetResult() != expectedResult {
 		t.Fatalf("Expected %s got %s", expectedResult, result.GetResult())
 	}
-	t.Logf("wrote to %+v", streamID)
 	gotEventID, _ := uuid.FromBytes(result.GetEvent().GetEvent().GetEventId())
 	if gotEventID != eventID {
 		t.Fatalf("Expected %v got %v", eventID, gotEventID)
