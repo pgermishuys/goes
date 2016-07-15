@@ -53,3 +53,36 @@ func TestReadSinglEvent_WithEventsInStream(t *testing.T) {
 		t.Fatalf("Expected %v got %v", eventID, gotEventID)
 	}
 }
+
+func TestReadSingleEvent_WithInvalidCredentials(t *testing.T) {
+	conn := createTestConnection(t)
+
+	streamID := uuid.NewV4().String()
+	eventID := uuid.NewV4()
+	events := []goes.Event{
+		goes.Event{
+			EventID:   eventID,
+			EventType: "TestEvent",
+			IsJSON:    true,
+			Data:      []byte("{}"),
+			Metadata:  []byte("{}"),
+		},
+	}
+
+	goes.AppendToStream(conn, streamID, -2, events)
+	conn.Close()
+
+	conn = createTestConnection(t)
+	defer conn.Close()
+	conn.Config.Login = "BadUser"
+	conn.Config.Password = "Pass"
+
+	_, err := goes.ReadSingleEvent(conn, "$all", 0, true, true)
+	if err == nil {
+		t.Fatalf("Expected failure")
+	}
+	expectedError := notAuthenticatedError
+	if err.Error() != expectedError {
+		t.Fatalf("Expected %s got %s", expectedError, err.Error())
+	}
+}

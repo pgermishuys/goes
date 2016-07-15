@@ -86,3 +86,37 @@ func TestReadStreamEventsBackward_WithReadingMoreEventsThanExistsInStream(t *tes
 		t.Fatalf("Expected %d got %d", 1, len(readResult.Events))
 	}
 }
+
+func TestReadStreamEventsBackward_WithInvalidCredentials(t *testing.T) {
+	conn := createTestConnection(t)
+
+	streamID := uuid.NewV4().String()
+	events := []goes.Event{
+		createTestEvent(),
+	}
+
+	result, err := goes.AppendToStream(conn, streamID, -2, events)
+
+	if err != nil {
+		t.Fatalf("Unexpected failure %+v", err)
+	}
+	expectedResult := protobuf.OperationResult_Success
+	if *result.Result != expectedResult {
+		t.Fatalf("Expected %s got %s", expectedResult, result.Result)
+	}
+	conn.Close()
+
+	conn = createTestConnection(t)
+	defer conn.Close()
+	conn.Config.Login = "BadUser"
+	conn.Config.Password = "Pass"
+
+	_, err = goes.ReadStreamEventsBackward(conn, streamID, -1, 2, true, true)
+	if err == nil {
+		t.Fatalf("Expected failure")
+	}
+	expectedError := notAuthenticatedError
+	if err.Error() != expectedError {
+		t.Fatalf("Expected %s got %s", expectedError, notAuthenticatedError)
+	}
+}

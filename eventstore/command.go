@@ -81,31 +81,31 @@ const (
 func (c Command) String() string {
 	s := ""
 	if c&heartbeatRequest == heartbeatRequest {
-		s += "Heartbeat Request"
+		s = "Heartbeat Request"
 	}
 	if c&heartbeatResponse == heartbeatResponse {
-		s += "Heartbeat Response"
+		s = "Heartbeat Response"
 	}
 	if c&ping == ping {
-		s += "Ping"
+		s = "Ping"
 	}
 	if c&pong == pong {
-		s += "Pong"
+		s = "Pong"
 	}
 	if c&writeEvents == writeEvents {
-		s += "Write Events"
+		s = "Write Events"
 	}
 	if c&writeEventsCompleted == writeEventsCompleted {
-		s += "Write Events Completed"
+		s = "Write Events Completed"
 	}
 	if c&badRequest == badRequest {
-		s += "Bad Request"
+		s = "Bad Request"
 	}
 	if c&notHandled == notHandled {
-		s += "Not Handled"
+		s = "Not Handled"
 	}
 	if c&notAuthenticated == notAuthenticated {
-		s += "Not Authenticated"
+		s = "Not Authenticated"
 	}
 	return s
 }

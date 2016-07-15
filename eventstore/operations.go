@@ -1,6 +1,7 @@
 package goes
 
 import (
+	"errors"
 	"log"
 
 	"github.com/golang/protobuf/proto"
@@ -37,14 +38,18 @@ func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion
 		log.Fatal("marshaling error: ", err)
 	}
 
-	pkg, err := newPackage(writeEvents, uuid.NewV4().Bytes(), "admin", "changeit", data)
+	pkg, err := newPackage(writeEvents, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password, data)
 	if err != nil {
 		log.Printf("[error] failed to create new write events package")
 	}
 	resultChan := make(chan TCPPackage)
 	sendPackage(pkg, conn, resultChan)
 	result := <-resultChan
+
 	complete := &protobuf.WriteEventsCompleted{}
+	if result.Command != writeEventsCompleted {
+		return *complete, errors.New(result.Command.String())
+	}
 	proto.Unmarshal(result.Data, complete)
 	log.Printf("[info] WriteEventsCompleted: %+v\n", complete)
 	return *complete, nil
@@ -62,7 +67,7 @@ func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber in
 		log.Fatal("marshaling error: ", err)
 	}
 
-	pkg, err := newPackage(readEvent, uuid.NewV4().Bytes(), "admin", "changeit", data)
+	pkg, err := newPackage(readEvent, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password, data)
 	if err != nil {
 		log.Printf("[error] failed to create new read event package")
 	}
@@ -70,6 +75,9 @@ func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber in
 	sendPackage(pkg, conn, resultChan)
 	result := <-resultChan
 	complete := &protobuf.ReadEventCompleted{}
+	if result.Command != readEventCompleted {
+		return *complete, errors.New(result.Command.String())
+	}
 	proto.Unmarshal(result.Data, complete)
 	log.Printf("[info] ReadEventCompleted: %+v\n", complete)
 	if complete.GetResult() == protobuf.ReadEventCompleted_Success {
@@ -91,7 +99,7 @@ func DeleteStream(conn *EventStoreConnection, streamID string, expectedVersion i
 	}
 
 	log.Printf("[info] Deleting Stream: %+v\n", deleteStreamData)
-	pkg, err := newPackage(deleteStream, uuid.NewV4().Bytes(), "admin", "changeit", data)
+	pkg, err := newPackage(deleteStream, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password, data)
 	if err != nil {
 		log.Printf("[error] failed to create new delete stream package")
 	}
@@ -99,6 +107,9 @@ func DeleteStream(conn *EventStoreConnection, streamID string, expectedVersion i
 	sendPackage(pkg, conn, resultChan)
 	result := <-resultChan
 	complete := &protobuf.DeleteStreamCompleted{}
+	if result.Command != deleteStreamCompleted {
+		return *complete, errors.New(result.Command.String())
+	}
 	proto.Unmarshal(result.Data, complete)
 	log.Printf("[info] DeleteStreamCompleted: %+v\n", complete)
 	return *complete, nil
@@ -118,7 +129,7 @@ func ReadStreamEventsForward(conn *EventStoreConnection, streamID string, from i
 	}
 
 	log.Printf("[info] Read Stream Forward: %+v\n", readStreamEventsForwardData)
-	pkg, err := newPackage(readStreamEventsForward, uuid.NewV4().Bytes(), "admin", "changeit", data)
+	pkg, err := newPackage(readStreamEventsForward, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password, data)
 	if err != nil {
 		log.Printf("[error] failed to create new read events forward stream package")
 	}
@@ -126,6 +137,9 @@ func ReadStreamEventsForward(conn *EventStoreConnection, streamID string, from i
 	sendPackage(pkg, conn, resultChan)
 	result := <-resultChan
 	complete := &protobuf.ReadStreamEventsCompleted{}
+	if result.Command != readStreamEventsForwardCompleted {
+		return *complete, errors.New(result.Command.String())
+	}
 	proto.Unmarshal(result.Data, complete)
 	log.Printf("[info] ReadStreamEventsForwardCompleted: %+v\n", complete)
 	if complete.GetResult() == protobuf.ReadStreamEventsCompleted_Success {
@@ -153,7 +167,7 @@ func ReadStreamEventsBackward(conn *EventStoreConnection, streamID string, from 
 	}
 
 	log.Printf("[info] Read Stream Backward: %+v\n", readStreamEventsBackwardData)
-	pkg, err := newPackage(readStreamEventsBackward, uuid.NewV4().Bytes(), "admin", "changeit", data)
+	pkg, err := newPackage(readStreamEventsBackward, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password, data)
 	if err != nil {
 		log.Printf("[error] failed to create new read events backward stream package")
 	}
@@ -161,6 +175,9 @@ func ReadStreamEventsBackward(conn *EventStoreConnection, streamID string, from 
 	sendPackage(pkg, conn, resultChan)
 	result := <-resultChan
 	complete := &protobuf.ReadStreamEventsCompleted{}
+	if result.Command != readStreamEventsBackwardCompleted {
+		return *complete, errors.New(result.Command.String())
+	}
 	proto.Unmarshal(result.Data, complete)
 	log.Printf("[info] ReadStreamEventsBackwardCompleted: %+v\n", complete)
 	if complete.GetResult() == protobuf.ReadStreamEventsCompleted_Success {
@@ -189,7 +206,7 @@ func SubscribeToStream(conn *EventStoreConnection, streamID string, resolveLinkT
 
 	log.Printf("[info] Subscription Data: %+v\n", subscriptionData)
 	correlationID := uuid.NewV4()
-	pkg, err := newPackage(subscribeToStream, correlationID.Bytes(), "admin", "changeit", data)
+	pkg, err := newPackage(subscribeToStream, correlationID.Bytes(), conn.Config.Login, conn.Config.Password, data)
 	if err != nil {
 		log.Printf("[error] failed to subscribe to stream package")
 	}

@@ -109,3 +109,36 @@ func TestDeleteStream_WithWrongExpectedVersion(t *testing.T) {
 		t.Fatalf("Expected %s got %s", expectedResult, deleteStreamResult.GetResult())
 	}
 }
+
+func TestDeleteStream_WithInvalidCredentials(t *testing.T) {
+	conn := createTestConnection(t)
+	events := []goes.Event{
+		createTestEvent(),
+	}
+
+	streamID := uuid.NewV4().String()
+	result, err := goes.AppendToStream(conn, streamID, -2, events)
+
+	if err != nil {
+		t.Fatalf("Unexpected failure %+v", err)
+	}
+	expectedResult := protobuf.OperationResult_Success
+	if *result.Result != expectedResult {
+		t.Fatalf("Expected %s got %s", expectedResult, result.Result)
+	}
+	conn.Close()
+
+	conn = createTestConnection(t)
+	defer conn.Close()
+	conn.Config.Login = "BadUser"
+	conn.Config.Login = "Pass"
+	_, err = goes.DeleteStream(conn, streamID, 1, false, true)
+
+	if err == nil {
+		t.Fatalf("Expected failure")
+	}
+	expectedError := notAuthenticatedError
+	if err.Error() != expectedError {
+		t.Fatalf("Expected %s got %s", expectedError, err.Error())
+	}
+}

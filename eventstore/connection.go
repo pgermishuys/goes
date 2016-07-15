@@ -11,8 +11,10 @@ import (
 )
 
 type Configuration struct {
-	Address string
-	Port    int
+	Address  string
+	Port     int
+	Login    string
+	Password string
 }
 
 type EventStoreConnection struct {
@@ -123,6 +125,11 @@ func readFromSocket(connection *EventStoreConnection) {
 				request <- msg
 			}
 			break
+		case notAuthenticated:
+			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
+			if request, ok := connection.requests[correlationID]; ok {
+				request <- msg
+			}
 		case 0x0F:
 			log.Fatal("[fatal] bad request sent")
 			break

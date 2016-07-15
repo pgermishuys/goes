@@ -8,10 +8,16 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+const (
+	notAuthenticatedError string = "Not Authenticated"
+)
+
 func createTestConnection(t *testing.T) *goes.EventStoreConnection {
 	config := &goes.Configuration{
-		Address: "127.0.0.1",
-		Port:    1113,
+		Address:  "127.0.0.1",
+		Port:     1113,
+		Login:    "admin",
+		Password: "changeit",
 	}
 	conn, err := goes.NewEventStoreConnection(config)
 	if err != nil {
@@ -94,5 +100,25 @@ func TestAppendToStream_WithInvalidExpectedVersion(t *testing.T) {
 	expectedResult := protobuf.OperationResult_WrongExpectedVersion
 	if result.GetResult() != expectedResult {
 		t.Fatalf("Expected %s got %s", expectedResult, result.GetResult())
+	}
+}
+
+func TestAppendToSystemStream_WithIncorrectCredentials(t *testing.T) {
+	conn := createTestConnection(t)
+	defer conn.Close()
+	conn.Config.Login = "BadUser"
+	conn.Config.Password = "Pass"
+	events := []goes.Event{
+		createTestEvent(),
+	}
+
+	_, err := goes.AppendToStream(conn, "$"+uuid.NewV4().String(), 0, events)
+
+	if err == nil {
+		t.Fatalf("Expected failure")
+	}
+	expectedError := notAuthenticatedError
+	if err.Error() != expectedError {
+		t.Fatalf("Expected %s got %s", expectedError, err.Error())
 	}
 }
