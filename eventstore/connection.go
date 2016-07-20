@@ -1,9 +1,11 @@
 package goes
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	"sync"
 
@@ -11,10 +13,12 @@ import (
 )
 
 type Configuration struct {
-	Address  string
-	Port     int
-	Login    string
-	Password string
+	Address           string
+	Port              int
+	Login             string
+	Password          string
+	ReconnectionDelay int
+	MaxReconnects     int
 }
 
 type EventStoreConnection struct {
@@ -31,20 +35,8 @@ type EventStoreConnection struct {
 func (connection *EventStoreConnection) Connect() error {
 	connection.requests = make(map[uuid.UUID]chan<- TCPPackage)
 	connection.subscriptions = make(map[uuid.UUID]*Subscription)
-	log.Printf("[info] connecting (id: %+v) to event store...\n", connection.ConnectionID)
 
-	address := fmt.Sprintf("%s:%v", connection.Config.Address, connection.Config.Port)
-	resolvedAddress, _ := net.ResolveTCPAddr("tcp", address)
-	conn, err := net.DialTCP("tcp", nil, resolvedAddress)
-	if err != nil {
-		return fmt.Errorf("failed to connect to event store on %+v. details: %s\n", address, err.Error())
-	}
-	log.Printf("[info] successfully connected to event store on %s (id: %+v)\n", address, connection.ConnectionID)
-	connection.Socket = conn
-	connection.connected = true
-
-	go readFromSocket(connection)
-	return nil
+	return connectWithRetries(connection, connection.Config.MaxReconnects)
 }
 
 // Close attempts to close the connection to Event Store
@@ -78,6 +70,40 @@ func NewEventStoreConnection(config *Configuration) (*EventStoreConnection, erro
 	return conn, nil
 }
 
+func connectWithRetries(connection *EventStoreConnection, retryAttempts int) error {
+	if retryAttempts > 0 {
+		err := connectInternal(connection)
+		if err != nil {
+			log.Printf("[error] reconnect attempt %v of %v failed: %v", retryAttempts, connection.Config.MaxReconnects, err.Error())
+			time.Sleep(time.Duration(connection.Config.ReconnectionDelay) * time.Millisecond)
+			return connectWithRetries(connection, retryAttempts-1)
+		}
+		return nil
+	} else {
+		return errors.New(fmt.Sprintf("failed to reconnect. Retry limit of %v reached.", connection.Config.MaxReconnects))
+	}
+}
+
+func connectInternal(connection *EventStoreConnection) error {
+	log.Printf("[info] connecting (id: %+v) to event store...\n", connection.ConnectionID)
+
+	address := fmt.Sprintf("%s:%v", connection.Config.Address, connection.Config.Port)
+	resolvedAddress, err := net.ResolveTCPAddr("tcp", address)
+	if err != nil {
+		return fmt.Errorf("failed to resolve tcp address %s\n", address)
+	}
+	conn, err := net.DialTCP("tcp", nil, resolvedAddress)
+	if err != nil {
+		return fmt.Errorf("failed to connect to event store on %+v. details: %s\n", address, err.Error())
+	}
+	log.Printf("[info] successfully connected to event store on %s (id: %+v)\n", address, connection.ConnectionID)
+	connection.Socket = conn
+	connection.connected = true
+
+	go readFromSocket(connection)
+	return nil
+}
+
 func readFromSocket(connection *EventStoreConnection) {
 	buffer := make([]byte, 40000)
 	for {
@@ -93,7 +119,12 @@ func readFromSocket(connection *EventStoreConnection) {
 			}
 			if err.Error() == "EOF" {
 				connection.Close()
-				connection.Connect()
+				err = connectWithRetries(connection, connection.Config.MaxReconnects)
+				if err != nil {
+					log.Fatalf("[fatal] (id: %+v) %s\n", connection.ConnectionID, err.Error())
+				} else {
+					log.Printf("[info] connection (id: %+v) reconnected\n", connection.ConnectionID)
+				}
 			}
 			break
 		}

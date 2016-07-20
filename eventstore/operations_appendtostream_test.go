@@ -14,10 +14,12 @@ const (
 
 func createTestConnection(t *testing.T) *goes.EventStoreConnection {
 	config := &goes.Configuration{
-		Address:  "127.0.0.1",
-		Port:     1113,
-		Login:    "admin",
-		Password: "changeit",
+		Address:           "127.0.0.1",
+		Port:              1113,
+		Login:             "admin",
+		Password:          "changeit",
+		MaxReconnects:     3,
+		ReconnectionDelay: 2000,
 	}
 	conn, err := goes.NewEventStoreConnection(config)
 	if err != nil {

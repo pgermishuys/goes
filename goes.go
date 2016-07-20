@@ -10,8 +10,12 @@ import (
 
 func main() {
 	config := &goes.Configuration{
-		Address: "127.0.0.1",
-		Port:    1113,
+		Address:           "127.0.0.1",
+		Port:              1113,
+		Login:             "admin",
+		Password:          "changeit",
+		MaxReconnects:     3,
+		ReconnectionDelay: 2000,
 	}
 	conn, err := goes.NewEventStoreConnection(config)
 	if err != nil {
