@@ -76,7 +76,7 @@ func connectWithRetries(connection *EventStoreConnection, retryAttempts int) err
 	if retryAttempts > 0 {
 		err := connectInternal(connection)
 		if err != nil {
-			log.Printf("[error] reconnect attempt %v of %v failed: %v", retryAttempts, connection.Config.MaxReconnects, err.Error())
+			log.Printf("[error] reconnect attempt %v of %v failed: %v", (connection.Config.MaxReconnects-retryAttempts)+1, connection.Config.MaxReconnects, err.Error())
 			time.Sleep(time.Duration(connection.Config.ReconnectionDelay) * time.Millisecond)
 			return connectWithRetries(connection, retryAttempts-1)
 		}
