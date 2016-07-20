@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"github.com/pgermishuys/goes/eventstore"
 	"github.com/pgermishuys/goes/protobuf"
@@ -44,10 +45,19 @@ func main() {
 	}
 	go goes.AppendToStream(conn, "shoppingCart-1", -2, events)
 	// go goes.ReadSingleEvent(conn, "$stats-127.0.0.1:2113", 0, true, true)
-	_, _ = goes.SubscribeToStream(conn, "shoppingCart-1", true, func(evnt *protobuf.StreamEventAppeared) {
+	subscribe(conn)
+	select {}
+}
+
+func subscribe(conn *goes.EventStoreConnection) {
+	_, err := goes.SubscribeToStream(conn, "shoppingCart-1", true, func(evnt *protobuf.StreamEventAppeared) {
 		log.Printf("[info] event appeared: %+v\n", evnt)
 	}, func(subDropped *protobuf.SubscriptionDropped) {
-		log.Printf("[info] subscription dropped\n", subDropped)
+		log.Printf("[info] subscription dropped %+v %s\n", subDropped, conn)
+		time.Sleep(time.Duration(5000) * time.Millisecond)
+		subscribe(conn)
 	})
-	select {}
+	if err != nil {
+		log.Printf("[error] failed to start subscription. %s", err.Error())
+	}
 }

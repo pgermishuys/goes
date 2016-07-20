@@ -210,6 +210,9 @@ func SubscribeToStream(conn *EventStoreConnection, streamID string, resolveLinkT
 	if err != nil {
 		log.Printf("[error] failed to subscribe to stream package")
 	}
+	if !conn.connected {
+		return nil, errors.New("the connection is closed")
+	}
 	resultChan := make(chan TCPPackage)
 	sendPackage(pkg, conn, resultChan)
 	result := <-resultChan

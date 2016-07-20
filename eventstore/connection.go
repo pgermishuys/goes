@@ -52,6 +52,7 @@ func (connection *EventStoreConnection) Close() error {
 	if err != nil {
 		log.Printf("[error] failed closing the connection to event store...%+v\n'", err)
 	}
+	connectionClosed(connection)
 	return err
 }
 
@@ -82,7 +83,7 @@ func connectWithRetries(connection *EventStoreConnection, retryAttempts int) err
 		}
 		return nil
 	} else {
-		connectionDropped(connection)
+		connectionClosed(connection)
 		return errors.New(fmt.Sprintf("failed to reconnect. Retry limit of %v reached.", connection.Config.MaxReconnects))
 	}
 }
@@ -107,7 +108,7 @@ func connectInternal(connection *EventStoreConnection) error {
 	return nil
 }
 
-func connectionDropped(connection *EventStoreConnection) {
+func connectionClosed(connection *EventStoreConnection) {
 	log.Printf("[error] connection (id: %+v) closed\n", connection.ConnectionID)
 
 	reason := protobuf.SubscriptionDropped_Unsubscribed
@@ -126,6 +127,8 @@ func connectionDropped(connection *EventStoreConnection) {
 		}
 		sub.Channel <- pkg
 	}
+	connection.requests = make(map[uuid.UUID]chan<- TCPPackage)
+	connection.subscriptions = make(map[uuid.UUID]*Subscription)
 }
 
 func readFromSocket(connection *EventStoreConnection) {
