@@ -9,6 +9,8 @@ import (
 
 	"sync"
 
+	"github.com/golang/protobuf/proto"
+	"github.com/pgermishuys/goes/protobuf"
 	"github.com/satori/go.uuid"
 )
 
@@ -80,6 +82,7 @@ func connectWithRetries(connection *EventStoreConnection, retryAttempts int) err
 		}
 		return nil
 	} else {
+		connectionDropped(connection)
 		return errors.New(fmt.Sprintf("failed to reconnect. Retry limit of %v reached.", connection.Config.MaxReconnects))
 	}
 }
@@ -104,6 +107,27 @@ func connectInternal(connection *EventStoreConnection) error {
 	return nil
 }
 
+func connectionDropped(connection *EventStoreConnection) {
+	log.Printf("[error] connection (id: %+v) closed\n", connection.ConnectionID)
+
+	reason := protobuf.SubscriptionDropped_Unsubscribed
+	subDropped := &protobuf.SubscriptionDropped{
+		Reason: &reason,
+	}
+	data, err := proto.Marshal(subDropped)
+	if err != nil {
+		log.Fatal("[fatal] marshalling error: ", err)
+	}
+
+	for _, sub := range connection.subscriptions {
+		pkg, err := newPackage(subscriptionDropped, sub.CorrelationID.Bytes(), connection.Config.Login, connection.Config.Password, data)
+		if err != nil {
+			log.Printf("[error] failed to drop subscription %v", sub.CorrelationID)
+		}
+		sub.Channel <- pkg
+	}
+}
+
 func readFromSocket(connection *EventStoreConnection) {
 	buffer := make([]byte, 40000)
 	for {
@@ -121,7 +145,7 @@ func readFromSocket(connection *EventStoreConnection) {
 				connection.Close()
 				err = connectWithRetries(connection, connection.Config.MaxReconnects)
 				if err != nil {
-					log.Fatalf("[fatal] (id: %+v) %s\n", connection.ConnectionID, err.Error())
+					log.Printf("[error] (id: %+v) %s\n", connection.ConnectionID, err.Error())
 				} else {
 					log.Printf("[info] connection (id: %+v) reconnected\n", connection.ConnectionID)
 				}
