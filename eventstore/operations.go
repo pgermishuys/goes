@@ -36,13 +36,13 @@ func HandleOperation(conn *EventStoreConnection, op *clientOperation) (TCPPackag
 
 	if decision == inspectionDecision_Retry {
 		if op.retryCount < conn.Config.MaxOperationRetries {
+			op.retryCount++
 			log.Printf("[info] retrying %+v command. Retry attempt %v of %v", op.networkPackage.Command.String(), op.retryCount+1, conn.Config.MaxOperationRetries)
-			// retry
+			return HandleOperation(conn, op)
 		} else {
 			log.Printf("[error] command %v failed. Retry limit of %v reached", op.networkPackage.Command.String(), conn.Config.MaxOperationRetries)
 		}
 	}
-	log.Printf("Decision has been reached for %v, %v. Decision: %v", result.Command.String(), decision)
 	return result, err
 }
 
@@ -90,6 +90,7 @@ func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion
 		proto.Unmarshal(result.Data, message)
 
 		res := message.Result
+		log.Printf("[info] WriteEventsCompleted result: %v\n", res)
 		switch *res {
 		case protobuf.OperationResult_Success:
 			return inspectionDecision(inspectionDecision_EndOperation), nil
@@ -98,7 +99,7 @@ func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion
 		case protobuf.OperationResult_WrongExpectedVersion, protobuf.OperationResult_StreamDeleted, protobuf.OperationResult_InvalidTransaction, protobuf.OperationResult_AccessDenied:
 			return inspectionDecision(inspectionDecision_EndOperation), nil
 		default:
-			log.Println("[warning] unknown operation result %v", res.String())
+			log.Printf("[warning] unknown operation result %v\n", res.String())
 			return inspectionDecision(inspectionDecision_EndOperation), nil
 		}
 	}

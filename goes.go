@@ -44,7 +44,13 @@ func main() {
 			Metadata:  []byte("metadata"),
 		},
 	}
-	go goes.AppendToStream(conn, "shoppingCart-1", -2, events)
+	result, err := goes.AppendToStream(conn, "shoppingCart-1", -2, events)
+	if *result.Result != protobuf.OperationResult_Success {
+		log.Printf("[info] WriteEvents failed. %v", result.Result.String())
+	}
+	if err != nil {
+		log.Printf("[error] WriteEvents failed. %v", err.Error())
+	}
 	// go goes.ReadSingleEvent(conn, "$stats-127.0.0.1:2113", 0, true, true)
 	subscribe(conn)
 	select {}
