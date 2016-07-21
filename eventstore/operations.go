@@ -9,6 +9,43 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+const (
+	inspectionDecision_EndOperation inspectionDecision = 0
+	inspectionDecision_Retry        inspectionDecision = 1
+)
+
+type inspectionDecision int32
+
+type inspectResult func(result TCPPackage) (inspectionDecision, error)
+
+type clientOperation struct {
+	networkPackage TCPPackage
+	inspectResult  inspectResult
+	retryCount     int
+}
+
+func HandleOperation(conn *EventStoreConnection, op *clientOperation) (TCPPackage, error) {
+	resultChan := make(chan TCPPackage)
+	sendPackage(op.networkPackage, conn, resultChan)
+	result := <-resultChan
+
+	decision, err := op.inspectResult(result)
+	if err != nil {
+		log.Printf("[error] %s", err.Error())
+	}
+
+	if decision == inspectionDecision_Retry {
+		if op.retryCount < conn.Config.MaxOperationRetries {
+			log.Printf("[info] retrying %+v command. Retry attempt %v of %v", op.networkPackage.Command.String(), op.retryCount+1, conn.Config.MaxOperationRetries)
+			// retry
+		} else {
+			log.Printf("[error] command %v failed. Retry limit of %v reached", op.networkPackage.Command.String(), conn.Config.MaxOperationRetries)
+		}
+	}
+	log.Printf("Decision has been reached for %v, %v. Decision: %v", result.Command.String(), decision)
+	return result, err
+}
+
 func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion int32, evnts []Event) (protobuf.WriteEventsCompleted, error) {
 	var events []*protobuf.NewEvent
 	for _, evnt := range evnts {
@@ -33,6 +70,7 @@ func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion
 		Events:          events,
 		RequireMaster:   proto.Bool(true),
 	}
+
 	data, err := proto.Marshal(writeEventsData)
 	if err != nil {
 		log.Fatal("marshaling error: ", err)
@@ -42,17 +80,46 @@ func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion
 	if err != nil {
 		log.Printf("[error] failed to create new write events package")
 	}
-	resultChan := make(chan TCPPackage)
-	sendPackage(pkg, conn, resultChan)
-	result := <-resultChan
 
-	complete := &protobuf.WriteEventsCompleted{}
-	if result.Command != writeEventsCompleted {
-		return *complete, errors.New(result.Command.String())
+	inspect := func(result TCPPackage) (inspectionDecision, error) {
+		if result.Command != writeEventsCompleted {
+			return inspectionDecision(inspectionDecision_EndOperation), errors.New(result.Command.String())
+		}
+
+		message := &protobuf.WriteEventsCompleted{}
+		proto.Unmarshal(result.Data, message)
+
+		res := message.Result
+		switch *res {
+		case protobuf.OperationResult_Success:
+			return inspectionDecision(inspectionDecision_EndOperation), nil
+		case protobuf.OperationResult_PrepareTimeout, protobuf.OperationResult_CommitTimeout, protobuf.OperationResult_ForwardTimeout:
+			return inspectionDecision(inspectionDecision_Retry), nil
+		case protobuf.OperationResult_WrongExpectedVersion, protobuf.OperationResult_StreamDeleted, protobuf.OperationResult_InvalidTransaction, protobuf.OperationResult_AccessDenied:
+			return inspectionDecision(inspectionDecision_EndOperation), nil
+		default:
+			log.Println("[warning] unknown operation result %v", res.String())
+			return inspectionDecision(inspectionDecision_EndOperation), nil
+		}
 	}
-	proto.Unmarshal(result.Data, complete)
-	log.Printf("[info] WriteEventsCompleted: %+v\n", complete)
-	return *complete, nil
+
+	op := clientOperation{
+		networkPackage: pkg,
+		inspectResult:  inspect,
+	}
+
+	result, err := HandleOperation(conn, &op)
+	message := &protobuf.WriteEventsCompleted{}
+	proto.Unmarshal(result.Data, message)
+	return *message, err
+
+	// complete := &protobuf.WriteEventsCompleted{}
+	// if result.Command != writeEventsCompleted {
+	// 	return *complete, errors.New(result.Command.String())
+	// }
+	// proto.Unmarshal(result.Data, complete)
+	// log.Printf("[info] WriteEventsCompleted: %+v\n", complete)
+	// return *complete, nil
 }
 
 func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber int32, resolveLinkTos bool, requireMaster bool) (protobuf.ReadEventCompleted, error) {

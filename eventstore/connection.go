@@ -15,12 +15,13 @@ import (
 )
 
 type Configuration struct {
-	Address           string
-	Port              int
-	Login             string
-	Password          string
-	ReconnectionDelay int
-	MaxReconnects     int
+	Address             string
+	Port                int
+	Login               string
+	Password            string
+	ReconnectionDelay   int
+	MaxReconnects       int
+	MaxOperationRetries int
 }
 
 type EventStoreConnection struct {
