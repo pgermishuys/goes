@@ -96,12 +96,15 @@ func TestAppendToStream_WithInvalidExpectedVersion(t *testing.T) {
 
 	result, err := goes.AppendToStream(conn, uuid.NewV4().String(), 0, events)
 
-	if err != nil {
-		t.Fatalf("Unexpected failure %+v", err)
+	if err == nil {
+		t.Fatalf("Expected failure")
 	}
 	expectedResult := protobuf.OperationResult_WrongExpectedVersion
 	if result.GetResult() != expectedResult {
 		t.Fatalf("Expected %s got %s", expectedResult, result.GetResult())
+	}
+	if err.Error() != protobuf.OperationResult_WrongExpectedVersion.String() {
+		t.Fatalf("Expected %s got %s", protobuf.OperationResult_WrongExpectedVersion.String(), err.Error())
 	}
 }
 

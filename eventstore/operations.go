@@ -31,7 +31,7 @@ func HandleOperation(conn *EventStoreConnection, op *clientOperation) (TCPPackag
 
 	decision, err := op.inspectResult(result)
 	if err != nil {
-		log.Printf("[error] %s", err.Error())
+		return result, err
 	}
 
 	if decision == inspectionDecision_Retry {
@@ -97,7 +97,7 @@ func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion
 		case protobuf.OperationResult_PrepareTimeout, protobuf.OperationResult_CommitTimeout, protobuf.OperationResult_ForwardTimeout:
 			return inspectionDecision(inspectionDecision_Retry), nil
 		case protobuf.OperationResult_WrongExpectedVersion, protobuf.OperationResult_StreamDeleted, protobuf.OperationResult_InvalidTransaction, protobuf.OperationResult_AccessDenied:
-			return inspectionDecision(inspectionDecision_EndOperation), nil
+			return inspectionDecision(inspectionDecision_EndOperation), errors.New(res.String())
 		default:
 			log.Printf("[warning] unknown operation result %v\n", res.String())
 			return inspectionDecision(inspectionDecision_EndOperation), nil
@@ -113,14 +113,6 @@ func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion
 	message := &protobuf.WriteEventsCompleted{}
 	proto.Unmarshal(result.Data, message)
 	return *message, err
-
-	// complete := &protobuf.WriteEventsCompleted{}
-	// if result.Command != writeEventsCompleted {
-	// 	return *complete, errors.New(result.Command.String())
-	// }
-	// proto.Unmarshal(result.Data, complete)
-	// log.Printf("[info] WriteEventsCompleted: %+v\n", complete)
-	// return *complete, nil
 }
 
 func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber int32, resolveLinkTos bool, requireMaster bool) (protobuf.ReadEventCompleted, error) {
@@ -139,19 +131,40 @@ func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber in
 	if err != nil {
 		log.Printf("[error] failed to create new read event package")
 	}
-	resultChan := make(chan TCPPackage)
-	sendPackage(pkg, conn, resultChan)
-	result := <-resultChan
-	complete := &protobuf.ReadEventCompleted{}
-	if result.Command != readEventCompleted {
-		return *complete, errors.New(result.Command.String())
+
+	inspect := func(result TCPPackage) (inspectionDecision, error) {
+		if result.Command != readEventCompleted {
+			return inspectionDecision_EndOperation, errors.New(result.Command.String())
+		}
+
+		complete := &protobuf.ReadEventCompleted{}
+		proto.Unmarshal(result.Data, complete)
+		res := complete.Result
+		log.Printf("[info] ReadEventCompleted result: %v\n", res)
+
+		switch *res {
+		case protobuf.ReadEventCompleted_Success, protobuf.ReadEventCompleted_NotFound, protobuf.ReadEventCompleted_NoStream, protobuf.ReadEventCompleted_StreamDeleted:
+			return inspectionDecision_EndOperation, nil
+		case protobuf.ReadEventCompleted_AccessDenied, protobuf.ReadEventCompleted_Error:
+			return inspectionDecision_EndOperation, errors.New(res.String())
+		default:
+			log.Printf("[warning] unknown operation result %v\n", res.String())
+			return inspectionDecision_EndOperation, nil
+		}
 	}
+
+	op := clientOperation{
+		networkPackage: pkg,
+		inspectResult:  inspect,
+	}
+	result, err := HandleOperation(conn, &op)
+
+	complete := &protobuf.ReadEventCompleted{}
 	proto.Unmarshal(result.Data, complete)
-	log.Printf("[info] ReadEventCompleted: %+v\n", complete)
-	if complete.GetResult() == protobuf.ReadEventCompleted_Success {
+	if err == nil && complete.GetResult() == protobuf.ReadEventCompleted_Success {
 		complete.Event.Event.EventId = DecodeNetUUID(complete.Event.Event.EventId)
 	}
-	return *complete, nil
+	return *complete, err
 }
 
 func DeleteStream(conn *EventStoreConnection, streamID string, expectedVersion int32, requireMaster bool, hardDelete bool) (protobuf.DeleteStreamCompleted, error) {
