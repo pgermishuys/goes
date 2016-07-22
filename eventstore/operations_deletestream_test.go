@@ -101,12 +101,15 @@ func TestDeleteStream_WithWrongExpectedVersion(t *testing.T) {
 	}
 	deleteStreamResult, err := goes.DeleteStream(conn, streamID, 1, false, true)
 
-	if err != nil {
-		t.Fatalf("Unexpected failure %+v", err)
+	if err == nil {
+		t.Fatalf("Expected an error")
 	}
 	expectedResult = protobuf.OperationResult_WrongExpectedVersion
 	if deleteStreamResult.GetResult() != expectedResult {
 		t.Fatalf("Expected %s got %s", expectedResult, deleteStreamResult.GetResult())
+	}
+	if err.Error() != expectedResult.String() {
+		t.Fatalf("Expected error %s got %s", expectedResult.String(), err.Error())
 	}
 }
 
