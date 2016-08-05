@@ -17,7 +17,7 @@ type TCPPackage struct {
 	Data          []byte
 }
 
-func newPackage(command Command, corrID []byte, login string, password string, data []byte) (TCPPackage, error) {
+func newPackage(command Command, data []byte, corrID []byte, login string, password string) (TCPPackage, error) {
 	var pkg = TCPPackage{
 		Command:       command,
 		CorrelationID: corrID,

@@ -39,7 +39,7 @@ func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion
 		log.Fatal("marshaling error: ", err)
 	}
 
-	pkg, err := newPackage(writeEvents, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password, data)
+	pkg, err := newPackage(writeEvents, data, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Printf("[error] failed to create new write events package")
 	}
@@ -80,7 +80,7 @@ func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber in
 		log.Fatal("marshaling error: ", err)
 	}
 
-	pkg, err := newPackage(readEvent, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password, data)
+	pkg, err := newPackage(readEvent, data, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Printf("[error] failed to create new read event package")
 	}
@@ -124,7 +124,7 @@ func DeleteStream(conn *EventStoreConnection, streamID string, expectedVersion i
 	}
 
 	log.Printf("[info] Deleting Stream: %+v\n", deleteStreamData)
-	pkg, err := newPackage(deleteStream, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password, data)
+	pkg, err := newPackage(deleteStream, data, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Printf("[error] failed to create new delete stream package")
 	}
@@ -165,7 +165,7 @@ func ReadStreamEventsForward(conn *EventStoreConnection, streamID string, from i
 	}
 
 	log.Printf("[info] Read Stream Forward: %+v\n", readStreamEventsForwardData)
-	pkg, err := newPackage(readStreamEventsForward, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password, data)
+	pkg, err := newPackage(readStreamEventsForward, data, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Println("[error] failed to create new read events forward stream package")
 	}
@@ -217,7 +217,7 @@ func ReadStreamEventsBackward(conn *EventStoreConnection, streamID string, from 
 	}
 
 	log.Printf("[info] Read Stream Backward: %+v\n", readStreamEventsBackwardData)
-	pkg, err := newPackage(readStreamEventsBackward, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password, data)
+	pkg, err := newPackage(readStreamEventsBackward, data, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Printf("[error] failed to create new read events backward stream package")
 	}
@@ -270,7 +270,7 @@ func SubscribeToStream(conn *EventStoreConnection, streamID string, resolveLinkT
 
 	log.Printf("[info] Subscription Data: %+v\n", subscriptionData)
 	correlationID := uuid.NewV4()
-	pkg, err := newPackage(subscribeToStream, correlationID.Bytes(), conn.Config.Login, conn.Config.Password, data)
+	pkg, err := newPackage(subscribeToStream, data, correlationID.Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Printf("[error] failed to subscribe to stream package")
 	}

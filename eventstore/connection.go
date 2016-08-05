@@ -122,7 +122,7 @@ func connectionClosed(connection *EventStoreConnection) {
 	}
 
 	for _, sub := range connection.subscriptions {
-		pkg, err := newPackage(subscriptionDropped, sub.CorrelationID.Bytes(), connection.Config.Login, connection.Config.Password, data)
+		pkg, err := newPackage(subscriptionDropped, data, sub.CorrelationID.Bytes(), connection.Config.Login, connection.Config.Password)
 		if err != nil {
 			log.Printf("[error] failed to drop subscription %v", sub.CorrelationID)
 		}
@@ -163,7 +163,7 @@ func readFromSocket(connection *EventStoreConnection) {
 		}
 		switch msg.Command {
 		case heartbeatRequest:
-			pkg, err := newPackage(heartbeatResponse, msg.CorrelationID, "", "", nil)
+			pkg, err := newPackage(heartbeatResponse, nil, msg.CorrelationID, "", "")
 			if err != nil {
 				log.Printf("[error] failed to create new heartbeat response package\n")
 			}
@@ -171,7 +171,7 @@ func readFromSocket(connection *EventStoreConnection) {
 			go sendPackage(pkg, connection, channel)
 			break
 		case pong:
-			pkg, err := newPackage(ping, uuid.NewV4().Bytes(), "", "", nil)
+			pkg, err := newPackage(ping, nil, uuid.NewV4().Bytes(), "", "")
 			if err != nil {
 				log.Printf("[error] failed to create new ping response package")
 			}
