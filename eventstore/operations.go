@@ -9,7 +9,7 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion int32, evnts []Event) (protobuf.WriteEventsCompleted, error) {
+func marshalToProtobufEvents(evnts []Event) []*protobuf.NewEvent {
 	var events []*protobuf.NewEvent
 	for _, evnt := range evnts {
 		dataContentType := int32(0)
@@ -27,6 +27,34 @@ func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion
 			},
 		)
 	}
+	return events
+}
+
+func performOperation(conn *EventStoreConnection, pkg TCPPackage, expectedResult Command) (TCPPackage, error) {
+	resultChan := make(chan TCPPackage)
+	sendPackage(pkg, conn, resultChan)
+	result := <-resultChan
+	if result.Command != expectedResult {
+		return result, errors.New(result.Command.String())
+	}
+	return result, nil
+}
+
+func shouldRetryOperation(operationResult *protobuf.OperationResult) (bool, error) {
+	if *operationResult == protobuf.OperationResult_AccessDenied ||
+		*operationResult == protobuf.OperationResult_WrongExpectedVersion {
+		return false, errors.New(operationResult.String())
+	}
+	if *operationResult == protobuf.OperationResult_CommitTimeout ||
+		*operationResult == protobuf.OperationResult_PrepareTimeout ||
+		*operationResult == protobuf.OperationResult_ForwardTimeout {
+		return true, nil
+	}
+	return false, nil
+}
+
+func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion int32, evnts []Event) (protobuf.WriteEventsCompleted, error) {
+	events := marshalToProtobufEvents(evnts)
 	writeEventsData := &protobuf.WriteEvents{
 		EventStreamId:   proto.String(streamID),
 		ExpectedVersion: proto.Int32(expectedVersion),
@@ -36,36 +64,31 @@ func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion
 
 	data, err := proto.Marshal(writeEventsData)
 	if err != nil {
-		log.Fatal("marshaling error: ", err)
+		log.Printf("[error] marshaling error: %s", err)
+		return protobuf.WriteEventsCompleted{}, err
 	}
 
 	pkg, err := newPackage(writeEvents, data, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Printf("[error] failed to create new write events package")
+		return protobuf.WriteEventsCompleted{}, err
 	}
 
-	inspectResult := func(result TCPPackage) (inspectionDecision, error) {
-		if result.Command != writeEventsCompleted {
-			return EndOperation, errors.New(result.Command.String())
+	for i := 0; i < conn.Config.MaxOperationRetries; i++ {
+		resultPackage, err := performOperation(conn, pkg, writeEventsCompleted)
+		if err != nil {
+			return protobuf.WriteEventsCompleted{}, err
 		}
 		message := &protobuf.WriteEventsCompleted{}
-		proto.Unmarshal(result.Data, message)
+		proto.Unmarshal(resultPackage.Data, message)
 
-		res := message.Result
-		log.Printf("[info] %v result: %v\n", result.Command.String(), res.String())
-
-		return inspectOperationResult(*res)
+		shouldRetry, err := shouldRetryOperation(message.Result)
+		if err != nil || !shouldRetry {
+			return *message, err
+		}
 	}
 
-	operation := clientOperation{
-		tcpPackage:    pkg,
-		inspectResult: inspectResult,
-	}
-
-	result, err := handleOperation(conn, &operation)
-	message := &protobuf.WriteEventsCompleted{}
-	proto.Unmarshal(result.Data, message)
-	return *message, err
+	return protobuf.WriteEventsCompleted{}, errors.New("Retry limit reached")
 }
 
 func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber int32, resolveLinkTos bool, requireMaster bool) (protobuf.ReadEventCompleted, error) {
