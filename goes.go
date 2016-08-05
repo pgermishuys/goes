@@ -10,15 +10,12 @@ import (
 )
 
 func main() {
-	config := &goes.Configuration{
-		Address:             "127.0.0.1",
-		Port:                1113,
-		Login:               "admin",
-		Password:            "changeit",
-		MaxReconnects:       10,
-		ReconnectionDelay:   100,
-		MaxOperationRetries: 10,
-	}
+	config := goes.NewConfiguration()
+	config.Address = "127.0.0.1"
+	config.Port = 1113
+	config.Login = "admin"
+	config.Password = "changeit"
+
 	conn, err := goes.NewEventStoreConnection(config)
 	if err != nil {
 		log.Fatalf("[fatal] %s", err.Error())

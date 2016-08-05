@@ -34,6 +34,15 @@ type EventStoreConnection struct {
 	Mutex         *sync.Mutex
 }
 
+// NewConfiguration creates a configuration with defualt settings
+func NewConfiguration() *Configuration {
+	return &Configuration{
+		ReconnectionDelay:   100,
+		MaxReconnects:       10,
+		MaxOperationRetries: 10,
+	}
+}
+
 // Connect attempts to connect to Event Store using the given configuration
 func (connection *EventStoreConnection) Connect() error {
 	connection.requests = make(map[uuid.UUID]chan<- TCPPackage)

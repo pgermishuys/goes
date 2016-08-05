@@ -13,15 +13,12 @@ const (
 )
 
 func createTestConnection(t *testing.T) *goes.EventStoreConnection {
-	config := &goes.Configuration{
-		Address:             "127.0.0.1",
-		Port:                1113,
-		Login:               "admin",
-		Password:            "changeit",
-		MaxReconnects:       3,
-		ReconnectionDelay:   2000,
-		MaxOperationRetries: 10,
-	}
+	config := goes.NewConfiguration()
+	config.Address = "127.0.0.1"
+	config.Port = 1113
+	config.Login = "admin"
+	config.Password = "changeit"
+
 	conn, err := goes.NewEventStoreConnection(config)
 	if err != nil {
 		t.Fatalf("Unexpected failure setting up test connection: %s", err.Error())
