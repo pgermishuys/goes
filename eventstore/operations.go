@@ -108,30 +108,23 @@ func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber in
 		log.Printf("[error] failed to create new read event package")
 	}
 
-	inspectResult := func(result TCPPackage) (inspectionDecision, error) {
-		if result.Command != readEventCompleted {
-			return EndOperation, errors.New(result.Command.String())
-		}
-		complete := &protobuf.ReadEventCompleted{}
-		proto.Unmarshal(result.Data, complete)
-		res := complete.Result
-		log.Printf("[info] ReadEventCompleted result: %v\n", res)
+	resultPackage, err := performOperation(conn, pkg, readEventCompleted)
+	if err != nil {
+		return protobuf.ReadEventCompleted{}, err
+	}
+	message := &protobuf.ReadEventCompleted{}
+	proto.Unmarshal(resultPackage.Data, message)
 
-		return inspectReadEventResult(*res)
+	if *message.Result == protobuf.ReadEventCompleted_AccessDenied ||
+		*message.Result == protobuf.ReadEventCompleted_Error {
+		return *message, errors.New(message.Result.String())
 	}
 
-	operation := clientOperation{
-		tcpPackage:    pkg,
-		inspectResult: inspectResult,
+	if *message.Result == protobuf.ReadEventCompleted_Success {
+		message.Event.Event.EventId = DecodeNetUUID(message.Event.Event.EventId)
 	}
-	result, err := handleOperation(conn, &operation)
 
-	complete := &protobuf.ReadEventCompleted{}
-	proto.Unmarshal(result.Data, complete)
-	if err == nil && complete.GetResult() == protobuf.ReadEventCompleted_Success {
-		complete.Event.Event.EventId = DecodeNetUUID(complete.Event.Event.EventId)
-	}
-	return *complete, err
+	return *message, nil
 }
 
 func DeleteStream(conn *EventStoreConnection, streamID string, expectedVersion int32, requireMaster bool, hardDelete bool) (protobuf.DeleteStreamCompleted, error) {
@@ -152,26 +145,21 @@ func DeleteStream(conn *EventStoreConnection, streamID string, expectedVersion i
 		log.Printf("[error] failed to create new delete stream package")
 	}
 
-	inspectResult := func(result TCPPackage) (inspectionDecision, error) {
-		if result.Command != deleteStreamCompleted {
-			return EndOperation, errors.New(result.Command.String())
+	for i := 0; i < conn.Config.MaxOperationRetries; i++ {
+		resultPackage, err := performOperation(conn, pkg, deleteStreamCompleted)
+		if err != nil {
+			return protobuf.DeleteStreamCompleted{}, err
 		}
-		complete := &protobuf.DeleteStreamCompleted{}
-		proto.Unmarshal(result.Data, complete)
-		res := complete.Result
-		log.Printf("[info] DeleteStreamCompleted result: %+v\n", res.String())
+		message := &protobuf.DeleteStreamCompleted{}
+		proto.Unmarshal(resultPackage.Data, message)
 
-		return inspectOperationResult(*res)
+		shouldRetry, err := shouldRetryOperation(message.Result)
+		if err != nil || !shouldRetry {
+			return *message, err
+		}
 	}
 
-	operation := clientOperation{
-		tcpPackage:    pkg,
-		inspectResult: inspectResult,
-	}
-	result, err := handleOperation(conn, &operation)
-	complete := &protobuf.DeleteStreamCompleted{}
-	proto.Unmarshal(result.Data, complete)
-	return *complete, err
+	return protobuf.DeleteStreamCompleted{}, errors.New("Retry limit reached")
 }
 
 func ReadStreamEventsForward(conn *EventStoreConnection, streamID string, from int32, maxCount int32, resolveLinkTos bool, requireMaster bool) (protobuf.ReadStreamEventsCompleted, error) {
@@ -193,37 +181,28 @@ func ReadStreamEventsForward(conn *EventStoreConnection, streamID string, from i
 		log.Println("[error] failed to create new read events forward stream package")
 	}
 
-	inspectResult := func(result TCPPackage) (inspectionDecision, error) {
-		if result.Command != readStreamEventsForwardCompleted {
-			return EndOperation, errors.New(result.Command.String())
-		}
-		complete := &protobuf.ReadStreamEventsCompleted{}
-		proto.Unmarshal(result.Data, complete)
-		res := complete.Result
-		log.Printf("[info] ReadStreamEventsForwardCompleted result: %+v\n", res.String())
+	resultPackage, err := performOperation(conn, pkg, readStreamEventsForwardCompleted)
+	if err != nil {
+		return protobuf.ReadStreamEventsCompleted{}, err
+	}
+	message := &protobuf.ReadStreamEventsCompleted{}
+	proto.Unmarshal(resultPackage.Data, message)
 
-		return inspectReadStreamResult(*res)
+	if *message.Result == protobuf.ReadStreamEventsCompleted_AccessDenied ||
+		*message.Result == protobuf.ReadStreamEventsCompleted_Error {
+		return *message, errors.New(message.Result.String())
 	}
 
-	operation := clientOperation{
-		tcpPackage:    pkg,
-		inspectResult: inspectResult,
-	}
-
-	result, err := handleOperation(conn, &operation)
-	complete := &protobuf.ReadStreamEventsCompleted{}
-	proto.Unmarshal(result.Data, complete)
-	log.Printf("[info] ReadStreamEventsForwardCompleted: %+v\n", complete)
-
-	if err == nil && complete.GetResult() == protobuf.ReadStreamEventsCompleted_Success {
-		for _, evnt := range complete.GetEvents() {
+	if *message.Result == protobuf.ReadStreamEventsCompleted_Success {
+		for _, evnt := range message.GetEvents() {
 			evnt.Event.EventId = DecodeNetUUID(evnt.Event.EventId)
 			if evnt.Link != nil {
 				evnt.Link.EventId = DecodeNetUUID(evnt.Link.EventId)
 			}
 		}
 	}
-	return *complete, err
+
+	return *message, nil
 }
 
 func ReadStreamEventsBackward(conn *EventStoreConnection, streamID string, from int32, maxCount int32, resolveLinkTos bool, requireMaster bool) (protobuf.ReadStreamEventsCompleted, error) {
@@ -245,37 +224,28 @@ func ReadStreamEventsBackward(conn *EventStoreConnection, streamID string, from 
 		log.Printf("[error] failed to create new read events backward stream package")
 	}
 
-	inspectResult := func(result TCPPackage) (inspectionDecision, error) {
-		if result.Command != readStreamEventsBackwardCompleted {
-			return EndOperation, errors.New(result.Command.String())
-		}
-		complete := &protobuf.ReadStreamEventsCompleted{}
-		proto.Unmarshal(result.Data, complete)
-		res := complete.Result
-		log.Printf("[info] ReadStreamEventsBackwardCompleted result: %+v\n", res.String())
+	resultPackage, err := performOperation(conn, pkg, readStreamEventsBackwardCompleted)
+	if err != nil {
+		return protobuf.ReadStreamEventsCompleted{}, err
+	}
+	message := &protobuf.ReadStreamEventsCompleted{}
+	proto.Unmarshal(resultPackage.Data, message)
 
-		return inspectReadStreamResult(*res)
+	if *message.Result == protobuf.ReadStreamEventsCompleted_AccessDenied ||
+		*message.Result == protobuf.ReadStreamEventsCompleted_Error {
+		return *message, errors.New(message.Result.String())
 	}
 
-	operation := clientOperation{
-		tcpPackage:    pkg,
-		inspectResult: inspectResult,
-	}
-	result, err := handleOperation(conn, &operation)
-
-	complete := &protobuf.ReadStreamEventsCompleted{}
-	proto.Unmarshal(result.Data, complete)
-	log.Printf("[info] ReadStreamEventsBackwardCompleted: %+v\n", complete)
-
-	if err == nil && complete.GetResult() == protobuf.ReadStreamEventsCompleted_Success {
-		for _, evnt := range complete.GetEvents() {
+	if *message.Result == protobuf.ReadStreamEventsCompleted_Success {
+		for _, evnt := range message.GetEvents() {
 			evnt.Event.EventId = DecodeNetUUID(evnt.Event.EventId)
 			if evnt.Link != nil {
 				evnt.Link.EventId = DecodeNetUUID(evnt.Link.EventId)
 			}
 		}
 	}
-	return *complete, err
+
+	return *message, nil
 }
 
 type eventAppeared func(*protobuf.StreamEventAppeared)
