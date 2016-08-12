@@ -1,7 +1,6 @@
 package goes
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -62,7 +61,7 @@ func (connection *EventStoreConnection) Close() error {
 	if err != nil {
 		log.Printf("[error] failed closing the connection to event store...%+v\n'", err)
 	}
-	connectionClosed(connection)
+	closeConnection(connection)
 	return err
 }
 
@@ -85,20 +84,19 @@ func NewEventStoreConnection(config *Configuration) (*EventStoreConnection, erro
 
 func connectWithRetries(connection *EventStoreConnection, retryAttempts int) error {
 	if retryAttempts > 0 {
-		err := connectInternal(connection)
+		err := connect(connection)
 		if err != nil {
 			log.Printf("[error] reconnect attempt %v of %v failed: %v", (connection.Config.MaxReconnects-retryAttempts)+1, connection.Config.MaxReconnects, err.Error())
 			time.Sleep(time.Duration(connection.Config.ReconnectionDelay) * time.Millisecond)
 			return connectWithRetries(connection, retryAttempts-1)
 		}
 		return nil
-	} else {
-		connectionClosed(connection)
-		return errors.New(fmt.Sprintf("failed to reconnect. Retry limit of %v reached.", connection.Config.MaxReconnects))
 	}
+	closeConnection(connection)
+	return fmt.Errorf("failed to reconnect. Retry limit of %v reached", connection.Config.MaxReconnects)
 }
 
-func connectInternal(connection *EventStoreConnection) error {
+func connect(connection *EventStoreConnection) error {
 	log.Printf("[info] connecting (id: %+v) to event store...\n", connection.ConnectionID)
 
 	address := fmt.Sprintf("%s:%v", connection.Config.Address, connection.Config.Port)
@@ -118,7 +116,7 @@ func connectInternal(connection *EventStoreConnection) error {
 	return nil
 }
 
-func connectionClosed(connection *EventStoreConnection) {
+func closeConnection(connection *EventStoreConnection) {
 	log.Printf("[error] connection (id: %+v) closed\n", connection.ConnectionID)
 
 	reason := protobuf.SubscriptionDropped_Unsubscribed
