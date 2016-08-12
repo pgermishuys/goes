@@ -57,7 +57,7 @@ func subscribe(conn *goes.EventStoreConnection) {
 	_, err := goes.SubscribeToStream(conn, "shoppingCart-1", true, func(evnt *protobuf.StreamEventAppeared) {
 		log.Printf("[info] event appeared: %+v\n", evnt)
 	}, func(subDropped *protobuf.SubscriptionDropped) {
-		log.Printf("[info] subscription dropped %+v %s\n", subDropped, conn)
+		log.Printf("[info] subscription dropped %+v %+v\n", subDropped, conn)
 		time.Sleep(time.Duration(5000) * time.Millisecond)
 		subscribe(conn)
 	})

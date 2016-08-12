@@ -366,3 +366,41 @@ func CreatePersistentSubscription(conn *EventStoreConnection, streamID string, g
 
 	return *message, nil
 }
+
+func ConnectToPersistentSubscription(conn *EventStoreConnection, stream string, groupName string, eventAppeared eventAppeared, dropped dropped, bufferSize int, autoAck bool) (*Subscription, error) {
+	subscriptionData := &protobuf.ConnectToPersistentSubscription{
+		SubscriptionId:          proto.String(groupName),
+		EventStreamId:           proto.String(stream),
+		AllowedInFlightMessages: proto.Int(bufferSize),
+	}
+
+	data, err := proto.Marshal(subscriptionData)
+	if err != nil {
+		log.Printf("[error] marshalling error: %s", err)
+		return nil, err
+	}
+
+	correlationID := uuid.NewV4()
+	pkg, err := newPackage(connectToPersistentSubscription, data, correlationID.Bytes(), conn.Config.Login, conn.Config.Password)
+	if err != nil {
+		log.Printf("[error] failed to create new connect to persistent subscription package")
+		return nil, err
+	}
+
+	if !conn.connected {
+		return nil, errors.New("the connection is closed")
+	}
+
+	resultChan := make(chan TCPPackage)
+	sendPackage(pkg, conn, resultChan)
+	result := <-resultChan
+	subscriptionConfirmation := &protobuf.PersistentSubscriptionConfirmation{}
+	proto.Unmarshal(result.Data, subscriptionConfirmation)
+	log.Printf("[info] ConnectToPersistentSubscription: %+v\n", subscriptionConfirmation)
+	subscription, err := NewSubscription(conn, correlationID, resultChan, eventAppeared, dropped)
+	if err != nil {
+		log.Printf("[error] failed to connect to persistent subscription %v\n", err)
+		return nil, err
+	}
+	return subscription, nil
+}
