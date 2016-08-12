@@ -319,6 +319,8 @@ func NewPersistentSubscriptionSettings() *PersistentSubscriptionSettings {
 	}
 }
 
+type persistentSubscriptionEventAppeared func(*protobuf.PersistentSubscriptionStreamEventAppeared)
+
 func CreatePersistentSubscription(conn *EventStoreConnection, streamID string, groupName string, settings PersistentSubscriptionSettings) (protobuf.CreatePersistentSubscriptionCompleted, error) {
 	subscriptionData := &protobuf.CreatePersistentSubscription{
 		SubscriptionGroupName:      proto.String(groupName),
@@ -367,7 +369,11 @@ func CreatePersistentSubscription(conn *EventStoreConnection, streamID string, g
 	return *message, nil
 }
 
-func ConnectToPersistentSubscription(conn *EventStoreConnection, stream string, groupName string, eventAppeared eventAppeared, dropped dropped, bufferSize int, autoAck bool) (*Subscription, error) {
+func ConnectToPersistentSubscription(conn *EventStoreConnection, stream string, groupName string, eventAppeared persistentSubscriptionEventAppeared, dropped dropped, bufferSize int, autoAck bool) (*PersistentSubscription, error) {
+	if bufferSize == 0 {
+		bufferSize = 10
+	}
+
 	subscriptionData := &protobuf.ConnectToPersistentSubscription{
 		SubscriptionId:          proto.String(groupName),
 		EventStreamId:           proto.String(stream),
@@ -397,7 +403,7 @@ func ConnectToPersistentSubscription(conn *EventStoreConnection, stream string, 
 	subscriptionConfirmation := &protobuf.PersistentSubscriptionConfirmation{}
 	proto.Unmarshal(result.Data, subscriptionConfirmation)
 	log.Printf("[info] ConnectToPersistentSubscription: %+v\n", subscriptionConfirmation)
-	subscription, err := NewSubscription(conn, correlationID, resultChan, eventAppeared, dropped)
+	subscription, err := NewPersistentSubscription(conn, correlationID, resultChan, eventAppeared, dropped, autoAck)
 	if err != nil {
 		log.Printf("[error] failed to connect to persistent subscription %v\n", err)
 		return nil, err

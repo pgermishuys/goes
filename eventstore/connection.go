@@ -187,7 +187,7 @@ func readFromSocket(connection *EventStoreConnection) {
 			channel := make(chan<- TCPPackage)
 			go sendPackage(pkg, connection, channel)
 			break
-		case writeEventsCompleted, readEventCompleted, deleteStreamCompleted, readStreamEventsForwardCompleted, readStreamEventsBackwardCompleted, subscriptionConfirmation, streamEventAppeared, createPersistentSubscriptionCompleted, persistentSubscriptionConfirmation:
+		case writeEventsCompleted, readEventCompleted, deleteStreamCompleted, readStreamEventsForwardCompleted, readStreamEventsBackwardCompleted, subscriptionConfirmation, streamEventAppeared, createPersistentSubscriptionCompleted, persistentSubscriptionConfirmation, persistentSubscriptionStreamEventAppeared:
 			correlationID, _ := uuid.FromBytes(msg.CorrelationID)
 			if request, ok := connection.requests[correlationID]; ok {
 				request <- msg

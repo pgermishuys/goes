@@ -3,6 +3,7 @@ package goes_test
 import (
 	"log"
 	"testing"
+	"time"
 
 	"github.com/pgermishuys/goes/eventstore"
 	"github.com/pgermishuys/goes/protobuf"
@@ -23,14 +24,33 @@ func TestConnectToPersistentSubscription_WhenSubscriptionExists(t *testing.T) {
 
 	log.Println("Created persistent subscription")
 
-	result, err := goes.ConnectToPersistentSubscription(conn, streamID, groupName, func(evnt *protobuf.StreamEventAppeared) {
+	eventAppeared := make(chan bool, 1)
+	_, err = goes.ConnectToPersistentSubscription(conn, streamID, groupName, func(evnt *protobuf.PersistentSubscriptionStreamEventAppeared) {
 		log.Printf("event appeared: %+v\n", evnt)
+		eventAppeared <- true
 	}, func(subDropped *protobuf.SubscriptionDropped) {
 		log.Printf("subscription dropped: %+v\n", subDropped)
 	}, 0, true)
 
-	log.Printf("Result: %+v\n", result)
 	if err != nil {
 		t.Fatalf("Unexpected error. %+v", err)
+	}
+
+	events := []goes.Event{
+		createTestEvent(),
+	}
+	_, err = goes.AppendToStream(conn, streamID, -2, events)
+	if err != nil {
+		t.Fatalf("Unexpected failure writing events %+v", err)
+	}
+
+	timeout := time.After(3 * time.Second)
+	select {
+	case <-eventAppeared:
+		t.Log("Event appeared")
+		break
+	case <-timeout:
+		t.Fatal("Timed out waiting for event to appear")
+		break
 	}
 }
