@@ -53,6 +53,7 @@ func shouldRetryOperation(operationResult *protobuf.OperationResult) (bool, erro
 	return false, nil
 }
 
+// AppendToStream appends an event to the stream
 func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion int32, evnts []Event) (protobuf.WriteEventsCompleted, error) {
 	events := marshalToProtobufEvents(evnts)
 	writeEventsData := &protobuf.WriteEvents{
@@ -91,6 +92,7 @@ func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion
 	return protobuf.WriteEventsCompleted{}, errors.New("Retry limit reached")
 }
 
+// ReadSingleEvent reads a single event from a stream
 func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber int32, resolveLinkTos bool, requireMaster bool) (protobuf.ReadEventCompleted, error) {
 	readEventsData := &protobuf.ReadEvent{
 		EventStreamId:  proto.String(streamID),
@@ -127,6 +129,7 @@ func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber in
 	return *message, nil
 }
 
+// DeleteStream will delete the stream
 func DeleteStream(conn *EventStoreConnection, streamID string, expectedVersion int32, requireMaster bool, hardDelete bool) (protobuf.DeleteStreamCompleted, error) {
 	deleteStreamData := &protobuf.DeleteStream{
 		EventStreamId:   proto.String(streamID),
@@ -162,6 +165,7 @@ func DeleteStream(conn *EventStoreConnection, streamID string, expectedVersion i
 	return protobuf.DeleteStreamCompleted{}, errors.New("Retry limit reached")
 }
 
+// ReadStreamEventsForward will read n number of events from the stream forward. The read includes the stream at the from position.
 func ReadStreamEventsForward(conn *EventStoreConnection, streamID string, from int32, maxCount int32, resolveLinkTos bool, requireMaster bool) (protobuf.ReadStreamEventsCompleted, error) {
 	readStreamEventsForwardData := &protobuf.ReadStreamEvents{
 		EventStreamId:   proto.String(streamID),
@@ -205,6 +209,7 @@ func ReadStreamEventsForward(conn *EventStoreConnection, streamID string, from i
 	return *message, nil
 }
 
+// ReadStreamEventsBackward will read n number of events from the stream backward.
 func ReadStreamEventsBackward(conn *EventStoreConnection, streamID string, from int32, maxCount int32, resolveLinkTos bool, requireMaster bool) (protobuf.ReadStreamEventsCompleted, error) {
 	readStreamEventsBackwardData := &protobuf.ReadStreamEvents{
 		EventStreamId:   proto.String(streamID),
@@ -251,6 +256,7 @@ func ReadStreamEventsBackward(conn *EventStoreConnection, streamID string, from 
 type eventAppeared func(*protobuf.StreamEventAppeared)
 type dropped func(*protobuf.SubscriptionDropped)
 
+//SubscribeToStream registers a subscription with the stream
 func SubscribeToStream(conn *EventStoreConnection, streamID string, resolveLinkTos bool, eventAppeared eventAppeared, dropped dropped) (*Subscription, error) {
 	subscriptionData := &protobuf.SubscribeToStream{
 		EventStreamId:  proto.String(streamID),
@@ -284,6 +290,7 @@ func SubscribeToStream(conn *EventStoreConnection, streamID string, resolveLinkT
 	return subscription, nil
 }
 
+// PersistentSubscriptionSettings describes the settings for the persistent subscription
 type PersistentSubscriptionSettings struct {
 	ResolveLinkTos             bool
 	StartFrom                  int
@@ -301,6 +308,7 @@ type PersistentSubscriptionSettings struct {
 	NamedConsumerStrategy      string
 }
 
+// NewPersistentSubscriptionSettings creates new subscription settings
 func NewPersistentSubscriptionSettings() *PersistentSubscriptionSettings {
 	return &PersistentSubscriptionSettings{
 		ResolveLinkTos:             false,
@@ -319,6 +327,7 @@ func NewPersistentSubscriptionSettings() *PersistentSubscriptionSettings {
 	}
 }
 
+// CreatePersistentSubscription creates a new persistent subscription
 func CreatePersistentSubscription(conn *EventStoreConnection, streamID string, groupName string, settings PersistentSubscriptionSettings) (protobuf.CreatePersistentSubscriptionCompleted, error) {
 	subscriptionData := &protobuf.CreatePersistentSubscription{
 		SubscriptionGroupName:      proto.String(groupName),
@@ -367,6 +376,7 @@ func CreatePersistentSubscription(conn *EventStoreConnection, streamID string, g
 	return *message, nil
 }
 
+// ConnectToPersistentSubscription connects to a persistent subscription
 func ConnectToPersistentSubscription(conn *EventStoreConnection, stream string, groupName string, eventAppeared eventAppeared, dropped dropped, bufferSize int, autoAck bool) (*Subscription, error) {
 	subscriptionData := &protobuf.ConnectToPersistentSubscription{
 		SubscriptionId:          proto.String(groupName),

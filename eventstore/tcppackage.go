@@ -123,7 +123,6 @@ func (pkg *TCPPackage) write(connection *EventStoreConnection) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("[info] wrote %+v bytes\n", totalMessageLength)
 	return nil
 }
 

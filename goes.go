@@ -11,8 +11,11 @@ import (
 
 func main() {
 	config := goes.NewConfiguration()
-	config.Address = "127.0.0.1"
-	config.Port = 1113
+	discoverer := goes.GossipEndpointDiscoverer{
+		MaxDiscoverAttempts: 10,
+		GossipSeeds:         []string{"http://127.0.0.1:2113", "http://127.0.0.1:1113"},
+	}
+	config.EndpointDiscoverer = discoverer.Discover
 	config.Login = "admin"
 	config.Password = "changeit"
 
