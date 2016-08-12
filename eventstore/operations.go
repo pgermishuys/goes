@@ -283,3 +283,86 @@ func SubscribeToStream(conn *EventStoreConnection, streamID string, resolveLinkT
 	conn.subscriptions[correlationID] = subscription
 	return subscription, nil
 }
+
+type PersistentSubscriptionSettings struct {
+	ResolveLinkTos             bool
+	StartFrom                  int
+	MessageTimeoutMilliseconds int
+	RecordStatistics           bool
+	LiveBufferSize             int
+	ReadBatchSize              int
+	BufferSize                 int
+	MaxRetryCount              int
+	PreferRoundRobit           bool
+	CheckpointAfterTime        int
+	CheckpointMaxCount         int
+	CheckpointMinCount         int
+	SubscriberMaxCount         int
+	NamedConsumerStrategy      string
+}
+
+func NewPersistentSubscriptionSettings() *PersistentSubscriptionSettings {
+	return &PersistentSubscriptionSettings{
+		ResolveLinkTos:             false,
+		StartFrom:                  -1,
+		RecordStatistics:           false,
+		MessageTimeoutMilliseconds: 30000,
+		BufferSize:                 500,
+		LiveBufferSize:             500,
+		MaxRetryCount:              10,
+		ReadBatchSize:              20,
+		CheckpointAfterTime:        2000,
+		CheckpointMinCount:         10,
+		CheckpointMaxCount:         1000,
+		SubscriberMaxCount:         0,
+		NamedConsumerStrategy:      "RoundRobin",
+	}
+}
+
+func CreatePersistentSubscription(conn *EventStoreConnection, streamID string, groupName string, settings PersistentSubscriptionSettings) (protobuf.CreatePersistentSubscriptionCompleted, error) {
+	subscriptionData := &protobuf.CreatePersistentSubscription{
+		SubscriptionGroupName:      proto.String(groupName),
+		EventStreamId:              proto.String(streamID),
+		ResolveLinkTos:             proto.Bool(settings.ResolveLinkTos),
+		StartFrom:                  proto.Int(settings.StartFrom),
+		MessageTimeoutMilliseconds: proto.Int(settings.MessageTimeoutMilliseconds),
+		RecordStatistics:           proto.Bool(settings.RecordStatistics),
+		LiveBufferSize:             proto.Int(settings.LiveBufferSize),
+		ReadBatchSize:              proto.Int(settings.ReadBatchSize),
+		BufferSize:                 proto.Int(settings.BufferSize),
+		MaxRetryCount:              proto.Int(settings.MaxRetryCount),
+		PreferRoundRobin:           proto.Bool(settings.PreferRoundRobit),
+		CheckpointAfterTime:        proto.Int(settings.CheckpointAfterTime),
+		CheckpointMaxCount:         proto.Int(settings.CheckpointMaxCount),
+		CheckpointMinCount:         proto.Int(settings.CheckpointMinCount),
+		SubscriberMaxCount:         proto.Int(settings.SubscriberMaxCount),
+		NamedConsumerStrategy:      proto.String(settings.NamedConsumerStrategy),
+	}
+
+	data, err := proto.Marshal(subscriptionData)
+	if err != nil {
+		log.Printf("[error] marshaling error: %s", err)
+		return protobuf.CreatePersistentSubscriptionCompleted{}, err
+	}
+
+	pkg, err := newPackage(createPersistentSubscription, data, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password)
+	if err != nil {
+		log.Printf("[error] failed to create new create persistent subscription package")
+		return protobuf.CreatePersistentSubscriptionCompleted{}, err
+	}
+
+	resultPackage, err := performOperation(conn, pkg, createPersistentSubscriptionCompleted)
+	if err != nil {
+		return protobuf.CreatePersistentSubscriptionCompleted{}, err
+	}
+	message := &protobuf.CreatePersistentSubscriptionCompleted{}
+	proto.Unmarshal(resultPackage.Data, message)
+
+	if *message.Result == protobuf.CreatePersistentSubscriptionCompleted_AccessDenied ||
+		*message.Result == protobuf.CreatePersistentSubscriptionCompleted_Fail ||
+		*message.Result == protobuf.CreatePersistentSubscriptionCompleted_AlreadyExists {
+		return *message, errors.New(message.Result.String())
+	}
+
+	return *message, nil
+}
