@@ -1,5 +1,6 @@
 package goes
 
+//Command represents a TCP Command
 type Command byte
 
 const (
