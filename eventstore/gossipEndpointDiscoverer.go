@@ -86,18 +86,24 @@ func gossip(gossipSeed string) (GossipResponse, error) {
 	body, _ := ioutil.ReadAll(response.Body)
 	var gossipResponse GossipResponse
 	err = json.Unmarshal(body, &gossipResponse)
+	if err != nil {
+		return GossipResponse{}, err
+	}
 	return gossipResponse, nil
 }
 
+//GossipSeed represents and endpoint where a gossip can be issued and nodes in a cluster discovered
 type GossipSeed struct {
 	ExternalTCPIP    string
 	ExternalHTTPPort int
 }
 
+//GossipResponse represents the response from a gossip request
 type GossipResponse struct {
 	Members []MemberInfo `json:"members"`
 }
 
+//MemberInfo represents the members in a cluster which is retrieved as part of the gossip request and lives inside of the members in the response
 type MemberInfo struct {
 	State            string `json:"state"`
 	IsAlive          bool   `json:"isAlive"`

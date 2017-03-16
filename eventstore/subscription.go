@@ -8,6 +8,7 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+//Subscription represents an Event Store Client Subscription to a stream
 type Subscription struct {
 	CorrelationID uuid.UUID
 	Connection    *EventStoreConnection
@@ -17,6 +18,7 @@ type Subscription struct {
 	Started       bool
 }
 
+//NewSubscription creates a new subscription to a stream
 func NewSubscription(connection *EventStoreConnection, correlationID uuid.UUID, channel chan TCPPackage, appeared eventAppeared, dropped dropped) (*Subscription, error) {
 	subscription := &Subscription{
 		Connection:    connection,
@@ -29,6 +31,7 @@ func NewSubscription(connection *EventStoreConnection, correlationID uuid.UUID, 
 	return subscription, nil
 }
 
+//Stop stops a subscription from receiving events
 func (subscription *Subscription) Stop() error {
 	log.Printf("[info] Stopping subscription")
 	subscription.Started = false
@@ -36,6 +39,8 @@ func (subscription *Subscription) Stop() error {
 	close(subscription.Channel)
 	return nil
 }
+
+//Start starts a subscription
 func (subscription *Subscription) Start() error {
 	subscription.Started = true
 	for subscription.Started {

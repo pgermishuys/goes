@@ -36,7 +36,7 @@ type EventStoreConnection struct {
 	Mutex         *sync.Mutex
 }
 
-// NewConfiguration creates a configuration with defualt settings
+// NewConfiguration creates a configuration with default settings
 func NewConfiguration() *Configuration {
 	return &Configuration{
 		ReconnectionDelay:   10000,
