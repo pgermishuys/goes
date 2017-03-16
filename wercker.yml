@@ -22,6 +22,14 @@ build:
         code: |
           go build ./...
 
+    # Coverage report 
+    - script:
+        name: go coverage
+        code: |
+            go get github.com/axw/gocov/gocov
+            go get github.com/mattn/goveralls
+            goveralls -service wercker -repotoken $coveralls_repo_token
+
     # Test the project
     - script:
         name: go test
