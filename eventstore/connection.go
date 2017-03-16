@@ -13,6 +13,7 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+// Configuration for an Event Store Connection
 type Configuration struct {
 	Address             string
 	Port                int
@@ -21,8 +22,10 @@ type Configuration struct {
 	ReconnectionDelay   int
 	MaxReconnects       int
 	MaxOperationRetries int
+	EndpointDiscoverer  EndpointDiscoverer
 }
 
+// EventStoreConnection will manage the lifetime and connection to an Event Store Node/Cluster
 type EventStoreConnection struct {
 	Config        *Configuration
 	Socket        *net.TCPConn
@@ -36,7 +39,7 @@ type EventStoreConnection struct {
 // NewConfiguration creates a configuration with defualt settings
 func NewConfiguration() *Configuration {
 	return &Configuration{
-		ReconnectionDelay:   100,
+		ReconnectionDelay:   10000,
 		MaxReconnects:       10,
 		MaxOperationRetries: 10,
 	}
@@ -46,7 +49,6 @@ func NewConfiguration() *Configuration {
 func (connection *EventStoreConnection) Connect() error {
 	connection.requests = make(map[uuid.UUID]chan<- TCPPackage)
 	connection.subscriptions = make(map[uuid.UUID]*Subscription)
-
 	return connectWithRetries(connection, connection.Config.MaxReconnects)
 }
 
@@ -65,13 +67,15 @@ func (connection *EventStoreConnection) Close() error {
 	return err
 }
 
-// NewConnection sets up a new Event Store Connection but does not open the connection
+// NewEventStoreConnection sets up a new Event Store Connection but does not open the connection
 func NewEventStoreConnection(config *Configuration) (*EventStoreConnection, error) {
-	if len(config.Address) == 0 {
-		return nil, fmt.Errorf("The address (%v) cannot be an empty string", config.Address)
-	}
-	if config.Port <= 0 {
-		return nil, fmt.Errorf("The port (%v) cannot be less or equal to 0", config.Port)
+	if config.EndpointDiscoverer == nil {
+		if len(config.Address) == 0 {
+			return nil, fmt.Errorf("The address (%v) cannot be an empty string", config.Address)
+		}
+		if config.Port <= 0 {
+			return nil, fmt.Errorf("The port (%v) cannot be less or equal to 0", config.Port)
+		}
 	}
 	conn := &EventStoreConnection{
 		Config:       config,
@@ -83,11 +87,26 @@ func NewEventStoreConnection(config *Configuration) (*EventStoreConnection, erro
 }
 
 func connectWithRetries(connection *EventStoreConnection, retryAttempts int) error {
+	if connection.Config.EndpointDiscoverer != nil {
+		memberInfo, err := connection.Config.EndpointDiscoverer()
+		if err != nil {
+			return err
+		}
+		connection.Config.Address = memberInfo.ExternalTCPIP
+		connection.Config.Port = memberInfo.ExternalTCPPort
+	}
 	if retryAttempts > 0 {
 		err := connect(connection)
 		if err != nil {
-			log.Printf("[error] reconnect attempt %v of %v failed: %v", (connection.Config.MaxReconnects-retryAttempts)+1, connection.Config.MaxReconnects, err.Error())
+			log.Printf("[info] reconnect attempt %v of %v failed: %v", (connection.Config.MaxReconnects-retryAttempts)+1, connection.Config.MaxReconnects, err.Error())
 			time.Sleep(time.Duration(connection.Config.ReconnectionDelay) * time.Millisecond)
+			//extract to appropriate method
+			if connection.Config.EndpointDiscoverer != nil {
+				log.Printf("[info] checking nodes")
+				memberInfo, _ := connection.Config.EndpointDiscoverer()
+				connection.Config.Address = memberInfo.ExternalTCPIP
+				connection.Config.Port = memberInfo.ExternalTCPPort
+			}
 			return connectWithRetries(connection, retryAttempts-1)
 		}
 		return nil
