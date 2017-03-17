@@ -3,7 +3,7 @@ GOES is an Event Store golang TCP Library for [Go](https://golang.org).
 [![Build Status](https://app.wercker.com/status/070a83e021d240488762de7d2fb01193/s/master "wercker status")](https://app.wercker.com/project/bykey/070a83e021d240488762de7d2fb01193)
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/pgermishuys/goes)
 [![Coverage Status](https://coveralls.io/repos/github/pgermishuys/goes/badge.svg?branch=HEAD)](https://coveralls.io/github/pgermishuys/goes?branch=HEAD)
-[![Go Report Card](https://goreportcard.com/badge/github.com/pgermishuys/goes?style=flat)](https://goreportcard.com/report/github.com/pgermishuys/goes)
+[![Go Report Card](https://goreportcard.com/badge/github.com/pgermishuys/goes)](https://goreportcard.com/report/github.com/pgermishuys/goes)
 
 # Example
 
