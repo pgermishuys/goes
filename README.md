@@ -10,10 +10,19 @@ GOES is an Event Store golang TCP Library for [Go](https://golang.org).
 ## Create a configuration that will be used to describe how to connect to Event Store
 ```Go
 config := goes.NewConfiguration()
-config.Address = "127.0.0.1"
-config.Port = 1113
 config.Login = "admin"
 config.Password = "changeit"
+//setup a discoverer for a single node
+discoverer := goes.StaticEndpointDiscoverer{
+    IPAddress: "127.0.0.1",
+    Port: 1113,
+}
+//or a cluster via gossip seeds
+discoverer = goes.GossipEndpointDiscoverer{
+    MaxDiscoverAttempts: 10,
+    GossipSeeds:         []string{"http://127.0.0.1:2113", "http://127.0.0.1:1113"},
+}
+config.EndpointDiscoverer = discoverer.Discover
 ```
 
 ## Connect to Event Store
