@@ -10,21 +10,22 @@ import (
 )
 
 func main() {
-	config := goes.NewConfiguration()
-	discoverer := goes.StaticEndpointDiscoverer{
-		IPAddress: "127.0.0.1",
-		Port: 1113,
+	config := &goes.Configuration{
+		ReconnectionDelay:   10000,
+		MaxReconnects:       10,
+		MaxOperationRetries: 10,
+		Address:             "127.0.0.1",
+		Port:                1113,
+		Login:               "admin",
+		Password:            "changeit",
 	}
-	config.EndpointDiscoverer = discoverer.Discover
-	config.Login = "admin"
-	config.Password = "changeit"
 
 	conn, err := goes.NewEventStoreConnection(config)
 	if err != nil {
 		log.Fatalf("[fatal] %s", err.Error())
 	}
-	err = conn.Connect()
 	defer conn.Close()
+	err = conn.Connect()
 	if err != nil {
 		log.Fatalf("[fatal] %s", err.Error())
 	}
