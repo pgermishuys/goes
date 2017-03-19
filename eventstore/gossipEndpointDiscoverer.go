@@ -13,7 +13,6 @@ import (
 type GossipEndpointDiscoverer struct {
 	MaxDiscoverAttempts int
 	GossipSeeds         []string
-	ClusterMembers      []MemberInfo
 }
 
 // Discover will discover nodes via performing a gossip over HTTP and then picking the best candidate to connect to
@@ -78,7 +77,6 @@ func getBestCandidate(response GossipResponse) (MemberInfo, error) {
 
 func gossip(gossipSeed string) (GossipResponse, error) {
 	response, err := http.Get(gossipSeed + "/gossip")
-	log.Printf("[info] got response from %s: %+v", gossipSeed, response)
 	if err != nil || response.StatusCode != http.StatusOK {
 		return GossipResponse{}, err
 	}

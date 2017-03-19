@@ -88,7 +88,7 @@ func NewEventStoreConnection(config *Configuration) (*EventStoreConnection, erro
 
 func connectWithRetries(connection *EventStoreConnection, retryAttempts int) error {
 	if connection.Config.EndpointDiscoverer != nil {
-		memberInfo, err := connection.Config.EndpointDiscoverer()
+		memberInfo, err := connection.Config.EndpointDiscoverer.Discover()
 		if err != nil {
 			return err
 		}
@@ -103,7 +103,7 @@ func connectWithRetries(connection *EventStoreConnection, retryAttempts int) err
 			//extract to appropriate method
 			if connection.Config.EndpointDiscoverer != nil {
 				log.Printf("[info] checking nodes")
-				memberInfo, _ := connection.Config.EndpointDiscoverer()
+				memberInfo, _ := connection.Config.EndpointDiscoverer.Discover()
 				connection.Config.Address = memberInfo.ExternalTCPIP
 				connection.Config.Port = memberInfo.ExternalTCPPort
 			}
