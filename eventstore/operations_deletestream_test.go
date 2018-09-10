@@ -3,9 +3,9 @@ package goes_test
 import (
 	"testing"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/pgermishuys/goes/eventstore"
 	"github.com/pgermishuys/goes/protobuf"
-	"github.com/satori/go.uuid"
 )
 
 func TestDeleteStream_WithSoftDelete(t *testing.T) {
@@ -15,7 +15,7 @@ func TestDeleteStream_WithSoftDelete(t *testing.T) {
 		createTestEvent(),
 	}
 
-	streamID := uuid.NewV4().String()
+	streamID := uuid.Must(uuid.NewV4()).String()
 	result, err := goes.AppendToStream(conn, streamID, -2, events)
 
 	if err != nil {
@@ -52,7 +52,7 @@ func TestDeleteStream_WithHardDelete(t *testing.T) {
 		createTestEvent(),
 	}
 
-	streamID := uuid.NewV4().String()
+	streamID := uuid.Must(uuid.NewV4()).String()
 	result, err := goes.AppendToStream(conn, streamID, -2, events)
 
 	if err != nil {
@@ -89,7 +89,7 @@ func TestDeleteStream_WithWrongExpectedVersion(t *testing.T) {
 		createTestEvent(),
 	}
 
-	streamID := uuid.NewV4().String()
+	streamID := uuid.Must(uuid.NewV4()).String()
 	result, err := goes.AppendToStream(conn, streamID, -2, events)
 
 	if err != nil {
@@ -119,7 +119,7 @@ func TestDeleteStream_WithInvalidCredentials(t *testing.T) {
 		createTestEvent(),
 	}
 
-	streamID := uuid.NewV4().String()
+	streamID := uuid.Must(uuid.NewV4()).String()
 	result, err := goes.AppendToStream(conn, streamID, -2, events)
 
 	if err != nil {

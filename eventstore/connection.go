@@ -8,9 +8,9 @@ import (
 
 	"sync"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/golang/protobuf/proto"
 	"github.com/pgermishuys/goes/protobuf"
-	"github.com/satori/go.uuid"
 )
 
 // Configuration for an Event Store Connection
@@ -77,9 +77,13 @@ func NewEventStoreConnection(config *Configuration) (*EventStoreConnection, erro
 			return nil, fmt.Errorf("The port (%v) cannot be less or equal to 0", config.Port)
 		}
 	}
+	connectionID, err := uuid.NewV4()
+	if err != nil {
+		return nil, err
+	}
 	conn := &EventStoreConnection{
 		Config:       config,
-		ConnectionID: uuid.NewV4(),
+		ConnectionID: connectionID,
 		Mutex:        &sync.Mutex{},
 	}
 	log.Printf("[info] created new event store connection : %+v", conn)
@@ -197,7 +201,7 @@ func readFromSocket(connection *EventStoreConnection) {
 			go sendPackage(pkg, connection, channel)
 			break
 		case pong:
-			pkg, err := newPackage(ping, nil, uuid.NewV4().Bytes(), "", "")
+			pkg, err := newPackage(ping, nil, newPackageCorrelationID().Bytes(), "", "")
 			if err != nil {
 				log.Printf("[error] failed to create new ping response package")
 			}

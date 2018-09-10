@@ -3,16 +3,16 @@ package goes_test
 import (
 	"testing"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/pgermishuys/goes/eventstore"
 	"github.com/pgermishuys/goes/protobuf"
-	"github.com/satori/go.uuid"
 )
 
 func TestReadSinglEvent_WithNoEventsInStream(t *testing.T) {
 	conn := createTestConnection(t)
 	defer conn.Close()
 
-	result, err := goes.ReadSingleEvent(conn, uuid.NewV4().String(), 0, true, true)
+	result, err := goes.ReadSingleEvent(conn, uuid.Must(uuid.NewV4()).String(), 0, true, true)
 	if err != nil {
 		t.Fatalf("Unexpected failure %+v", err)
 	}
@@ -26,8 +26,8 @@ func TestReadSinglEvent_WithEventsInStream(t *testing.T) {
 	conn := createTestConnection(t)
 	defer conn.Close()
 
-	streamID := uuid.NewV4().String()
-	eventID := uuid.NewV4()
+	streamID := uuid.Must(uuid.NewV4()).String()
+	eventID := uuid.Must(uuid.NewV4())
 	events := []goes.Event{
 		goes.Event{
 			EventID:   eventID,
@@ -57,8 +57,8 @@ func TestReadSinglEvent_WithEventsInStream(t *testing.T) {
 func TestReadSingleEvent_WithInvalidCredentials(t *testing.T) {
 	conn := createTestConnection(t)
 
-	streamID := uuid.NewV4().String()
-	eventID := uuid.NewV4()
+	streamID := uuid.Must(uuid.NewV4()).String()
+	eventID := uuid.Must(uuid.NewV4())
 	events := []goes.Event{
 		goes.Event{
 			EventID:   eventID,

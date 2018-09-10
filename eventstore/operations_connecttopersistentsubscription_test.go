@@ -4,9 +4,9 @@ import (
 	"log"
 	"testing"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/pgermishuys/goes/eventstore"
 	"github.com/pgermishuys/goes/protobuf"
-	"github.com/satori/go.uuid"
 )
 
 func TestConnectToPersistentSubscription_WhenSubscriptionExists(t *testing.T) {
@@ -15,7 +15,7 @@ func TestConnectToPersistentSubscription_WhenSubscriptionExists(t *testing.T) {
 
 	settings := goes.NewPersistentSubscriptionSettings()
 	streamID := "testStream"
-	groupName := uuid.NewV4().String()
+	groupName := uuid.Must(uuid.NewV4()).String()
 	_, err := goes.CreatePersistentSubscription(conn, streamID, groupName, *settings)
 	if err != nil {
 		t.Fatalf("Unexpected error creating subscription. %+v", err)

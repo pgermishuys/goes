@@ -6,10 +6,11 @@ build:
     - script:
         name: install eventstore
         code: |
+          apt-get update
           apt-get install wget
-          wget http://download.geteventstore.com/binaries/EventStore-OSS-Ubuntu-14.04-v3.8.1.tar.gz
-          tar xfv EventStore-OSS-Ubuntu-14.04-v3.8.1.tar.gz
-          nohup ./EventStore-OSS-Ubuntu-14.04-v3.8.1/eventstored &
+          wget https://eventstore.org/downloads/EventStore-OSS-Ubuntu-14.04-v4.1.1-hotfix1.tar.gz
+          tar xfv EventStore-OSS-Ubuntu-14.04-v4.1.1-hotfix1.tar.gz
+          nohup ./EventStore-OSS-Ubuntu-14.04-v4.1.1-hotfix1/eventstored &
 
     - script:
         name: go get

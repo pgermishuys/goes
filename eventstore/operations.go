@@ -4,9 +4,9 @@ import (
 	"errors"
 	"log"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/golang/protobuf/proto"
 	"github.com/pgermishuys/goes/protobuf"
-	"github.com/satori/go.uuid"
 )
 
 func marshalToProtobufEvents(evnts []Event) []*protobuf.NewEvent {
@@ -53,6 +53,14 @@ func shouldRetryOperation(operationResult *protobuf.OperationResult) (bool, erro
 	return false, nil
 }
 
+func newPackageCorrelationID() uuid.UUID {
+	corrID, err := uuid.NewV4()
+	if err != nil {
+		log.Fatalf("[fatal] failed to create new correlationID for package: %+v\n", err)
+	}
+	return corrID
+}
+
 // AppendToStream appends an event to the stream
 func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion int32, evnts []Event) (protobuf.WriteEventsCompleted, error) {
 	events := marshalToProtobufEvents(evnts)
@@ -69,7 +77,7 @@ func AppendToStream(conn *EventStoreConnection, streamID string, expectedVersion
 		return protobuf.WriteEventsCompleted{}, err
 	}
 
-	pkg, err := newPackage(writeEvents, data, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password)
+	pkg, err := newPackage(writeEvents, data, newPackageCorrelationID().Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Printf("[error] failed to create new write events package")
 		return protobuf.WriteEventsCompleted{}, err
@@ -105,7 +113,7 @@ func ReadSingleEvent(conn *EventStoreConnection, streamID string, eventNumber in
 		log.Fatal("marshaling error: ", err)
 	}
 
-	pkg, err := newPackage(readEvent, data, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password)
+	pkg, err := newPackage(readEvent, data, newPackageCorrelationID().Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Printf("[error] failed to create new read event package")
 	}
@@ -143,7 +151,7 @@ func DeleteStream(conn *EventStoreConnection, streamID string, expectedVersion i
 	}
 
 	log.Printf("[info] Deleting Stream: %+v\n", deleteStreamData)
-	pkg, err := newPackage(deleteStream, data, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password)
+	pkg, err := newPackage(deleteStream, data, newPackageCorrelationID().Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Printf("[error] failed to create new delete stream package")
 	}
@@ -180,7 +188,7 @@ func ReadStreamEventsForward(conn *EventStoreConnection, streamID string, from i
 	}
 
 	log.Printf("[info] Read Stream Forward: %+v\n", readStreamEventsForwardData)
-	pkg, err := newPackage(readStreamEventsForward, data, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password)
+	pkg, err := newPackage(readStreamEventsForward, data, newPackageCorrelationID().Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Println("[error] failed to create new read events forward stream package")
 	}
@@ -224,7 +232,7 @@ func ReadStreamEventsBackward(conn *EventStoreConnection, streamID string, from 
 	}
 
 	log.Printf("[info] Read Stream Backward: %+v\n", readStreamEventsBackwardData)
-	pkg, err := newPackage(readStreamEventsBackward, data, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password)
+	pkg, err := newPackage(readStreamEventsBackward, data, newPackageCorrelationID().Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Printf("[error] failed to create new read events backward stream package")
 	}
@@ -268,7 +276,7 @@ func SubscribeToStream(conn *EventStoreConnection, streamID string, resolveLinkT
 	}
 
 	log.Printf("[info] Subscription Data: %+v\n", subscriptionData)
-	correlationID := uuid.NewV4()
+	correlationID := newPackageCorrelationID()
 	pkg, err := newPackage(subscribeToStream, data, correlationID.Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Printf("[error] failed to subscribe to stream package")
@@ -354,7 +362,7 @@ func CreatePersistentSubscription(conn *EventStoreConnection, streamID string, g
 		return protobuf.CreatePersistentSubscriptionCompleted{}, err
 	}
 
-	pkg, err := newPackage(createPersistentSubscription, data, uuid.NewV4().Bytes(), conn.Config.Login, conn.Config.Password)
+	pkg, err := newPackage(createPersistentSubscription, data, newPackageCorrelationID().Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Printf("[error] failed to create new create persistent subscription package")
 		return protobuf.CreatePersistentSubscriptionCompleted{}, err
@@ -390,7 +398,7 @@ func ConnectToPersistentSubscription(conn *EventStoreConnection, stream string, 
 		return nil, err
 	}
 
-	correlationID := uuid.NewV4()
+	correlationID := newPackageCorrelationID()
 	pkg, err := newPackage(connectToPersistentSubscription, data, correlationID.Bytes(), conn.Config.Login, conn.Config.Password)
 	if err != nil {
 		log.Printf("[error] failed to create new connect to persistent subscription package")

@@ -74,7 +74,7 @@ func TestGossipEndPointDiscoverer_WithAliveMaster(t *testing.T) {
 		t.Fatalf("Expected State to be Master but was %s", member.State)
 	}
 	if member.IsAlive != true {
-		t.Fatalf("Expected IsAlive to be true but was %s", member.IsAlive)
+		t.Fatalf("Expected IsAlive to be true but was %v", member.IsAlive)
 	}
 }
 
@@ -132,6 +132,6 @@ func TestGossipEndPointDiscoverer_WithTheFirstGossipRequestFailing(t *testing.T)
 		t.Fatalf("Expected State to be Master but was %s", member.State)
 	}
 	if member.IsAlive != true {
-		t.Fatalf("Expected IsAlive to be true but was %s", member.IsAlive)
+		t.Fatalf("Expected IsAlive to be true but was %v", member.IsAlive)
 	}
 }
