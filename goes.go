@@ -4,9 +4,9 @@ import (
 	"log"
 	"time"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/pgermishuys/goes/eventstore"
 	"github.com/pgermishuys/goes/protobuf"
-	"github.com/satori/go.uuid"
 )
 
 func main() {
@@ -31,21 +31,21 @@ func main() {
 	}
 	events := []goes.Event{
 		goes.Event{
-			EventID:   uuid.NewV4(),
+			EventID:   uuid.Must(uuid.NewV4()),
 			EventType: "itemAdded",
 			IsJSON:    true,
 			Data:      []byte("{\"price\": \"100\"}"),
 			Metadata:  []byte("metadata"),
 		},
 		goes.Event{
-			EventID:   uuid.NewV4(),
+			EventID:   uuid.Must(uuid.NewV4()),
 			EventType: "itemAdded",
 			IsJSON:    true,
 			Data:      []byte("{\"price\": \"120\"}"),
 			Metadata:  []byte("metadata"),
 		},
 	}
-	result, err := goes.AppendToStream(conn, "shoppingCart-1", -2, events)
+	result, err := goes.AppendToStream(conn, "shoppingCart-1", 5, events)
 	if *result.Result != protobuf.OperationResult_Success {
 		log.Printf("[info] WriteEvents failed. %v", result.Result.String())
 	}

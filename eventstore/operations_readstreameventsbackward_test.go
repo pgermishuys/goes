@@ -3,16 +3,16 @@ package goes_test
 import (
 	"testing"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/pgermishuys/goes/eventstore"
 	"github.com/pgermishuys/goes/protobuf"
-	"github.com/satori/go.uuid"
 )
 
 func TestReadStreamEventsBackward_WithEmptyStream(t *testing.T) {
 	conn := createTestConnection(t)
 	defer conn.Close()
 
-	result, err := goes.ReadStreamEventsBackward(conn, uuid.NewV4().String(), 0, 1, true, true)
+	result, err := goes.ReadStreamEventsBackward(conn, uuid.Must(uuid.NewV4()).String(), 0, 1, true, true)
 	if err != nil {
 		t.Fatalf("Unexpected failure %+v", err)
 	}
@@ -26,7 +26,7 @@ func TestReadStreamEventsBackward_WithStreamContainingEvents(t *testing.T) {
 	conn := createTestConnection(t)
 	defer conn.Close()
 
-	streamID := uuid.NewV4().String()
+	streamID := uuid.Must(uuid.NewV4()).String()
 	events := []goes.Event{
 		createTestEvent(),
 		createTestEvent(),
@@ -59,7 +59,7 @@ func TestReadStreamEventsBackward_WithReadingMoreEventsThanExistsInStream(t *tes
 	conn := createTestConnection(t)
 	defer conn.Close()
 
-	streamID := uuid.NewV4().String()
+	streamID := uuid.Must(uuid.NewV4()).String()
 	events := []goes.Event{
 		createTestEvent(),
 	}
@@ -90,7 +90,7 @@ func TestReadStreamEventsBackward_WithReadingMoreEventsThanExistsInStream(t *tes
 func TestReadStreamEventsBackward_WithInvalidCredentials(t *testing.T) {
 	conn := createTestConnection(t)
 
-	streamID := uuid.NewV4().String()
+	streamID := uuid.Must(uuid.NewV4()).String()
 	events := []goes.Event{
 		createTestEvent(),
 	}

@@ -3,9 +3,9 @@ package goes_test
 import (
 	"testing"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/pgermishuys/goes/eventstore"
 	"github.com/pgermishuys/goes/protobuf"
-	"github.com/satori/go.uuid"
 )
 
 const (
@@ -32,7 +32,7 @@ func createTestConnection(t *testing.T) *goes.EventStoreConnection {
 
 func createTestEvent() goes.Event {
 	return goes.Event{
-		EventID:   uuid.NewV4(),
+		EventID:   uuid.Must(uuid.NewV4()),
 		EventType: "TestEvent",
 		IsJSON:    true,
 		Data:      []byte("{}"),
@@ -47,7 +47,7 @@ func TestAppendToStream_SingleEvent(t *testing.T) {
 		createTestEvent(),
 	}
 
-	result, err := goes.AppendToStream(conn, uuid.NewV4().String(), -2, events)
+	result, err := goes.AppendToStream(conn, uuid.Must(uuid.NewV4()).String(), -2, events)
 
 	if err != nil {
 		t.Fatalf("Unexpected failure %+v", err)
@@ -70,7 +70,7 @@ func TestAppendToStream_MultipleEvents(t *testing.T) {
 		createTestEvent(),
 	}
 
-	result, err := goes.AppendToStream(conn, uuid.NewV4().String(), -2, events)
+	result, err := goes.AppendToStream(conn, uuid.Must(uuid.NewV4()).String(), -2, events)
 
 	if err != nil {
 		t.Fatalf("Unexpected failure %+v", err)
@@ -92,7 +92,7 @@ func TestAppendToStream_WithInvalidExpectedVersion(t *testing.T) {
 		createTestEvent(),
 	}
 
-	result, err := goes.AppendToStream(conn, uuid.NewV4().String(), 0, events)
+	result, err := goes.AppendToStream(conn, uuid.Must(uuid.NewV4()).String(), 0, events)
 
 	if err == nil {
 		t.Fatalf("Expected failure")
@@ -115,7 +115,7 @@ func TestAppendToSystemStream_WithIncorrectCredentials(t *testing.T) {
 		createTestEvent(),
 	}
 
-	_, err := goes.AppendToStream(conn, "$"+uuid.NewV4().String(), 0, events)
+	_, err := goes.AppendToStream(conn, "$"+uuid.Must(uuid.NewV4()).String(), 0, events)
 
 	if err == nil {
 		t.Fatalf("Expected failure")

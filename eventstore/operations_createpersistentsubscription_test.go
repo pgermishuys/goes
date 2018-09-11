@@ -3,9 +3,9 @@ package goes_test
 import (
 	"testing"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/pgermishuys/goes/eventstore"
 	"github.com/pgermishuys/goes/protobuf"
-	"github.com/satori/go.uuid"
 )
 
 func TestCreatePersistentSubscription_CreateNewSubscription(t *testing.T) {
@@ -13,7 +13,7 @@ func TestCreatePersistentSubscription_CreateNewSubscription(t *testing.T) {
 	defer conn.Close()
 
 	settings := goes.NewPersistentSubscriptionSettings()
-	groupName := uuid.NewV4().String()
+	groupName := uuid.Must(uuid.NewV4()).String()
 	result, err := goes.CreatePersistentSubscription(conn, "testStream", groupName, *settings)
 
 	if err != nil {
@@ -31,7 +31,7 @@ func TestCreatePersistentSubscription_WhenSubscriptionExists(t *testing.T) {
 	defer conn.Close()
 
 	settings := goes.NewPersistentSubscriptionSettings()
-	groupName := uuid.NewV4().String()
+	groupName := uuid.Must(uuid.NewV4()).String()
 
 	_, err := goes.CreatePersistentSubscription(conn, "testStream", groupName, *settings)
 	if err != nil {

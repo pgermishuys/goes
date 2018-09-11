@@ -1,8 +1,6 @@
 package goes
 
-import (
-	"github.com/satori/go.uuid"
-)
+import uuid "github.com/gofrs/uuid"
 
 //Event is a structure that is used to help in marshalling events to and from a tcp package
 type Event struct {

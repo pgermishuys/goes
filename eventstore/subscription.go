@@ -3,9 +3,9 @@ package goes
 import (
 	"log"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/golang/protobuf/proto"
 	"github.com/pgermishuys/goes/protobuf"
-	"github.com/satori/go.uuid"
 )
 
 //Subscription represents an Event Store Client Subscription to a stream
